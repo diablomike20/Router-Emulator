@@ -1,0 +1,99 @@
+name: RE LT500D donor CGI trace
+
+permissions:
+  contents: write
+
+concurrency:
+  group: re-lt500d-cgitrace
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - lt500d-r25-emulator-v1
+    paths:
+      - ".github/workflows/RE-lt500d-r25-cgi-trace.yml"
+
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install trace dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools unzip curl file binutils
+
+      - name: Download and verify official donor
+        run: |
+          set -euo pipefail
+          URL='https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip?v=5016960833307663900'
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/r25.zip "$URL"
+          mkdir -p /tmp/r25-fw
+          unzip -j /tmp/r25.zip -d /tmp/r25-fw
+          FLASH="$(find /tmp/r25-fw -type f -name '*flash.bin' | head -1)"
+          test "$(stat -c %s "$FLASH")" = "12124315"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
+          cp "$FLASH" /tmp/r25.bin
+
+      - name: Extract and trace CGI/uhttpd
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cgitrace
+          mkdir -p /tmp/cgitrace/root
+          dd if=/tmp/r25.bin of=/tmp/cgitrace/root.squashfs bs=1 skip=$((0x2a7d4d)) status=none
+          unsquashfs -d /tmp/cgitrace/root /tmp/cgitrace/root.squashfs >/tmp/cgitrace/unsquash.log 2>&1 || true
+          R=/tmp/cgitrace/root
+          OUT=RE-LT500D-R25-DONOR-CGI-TRACE.txt
+          {
+            echo 'RE LT500D R25 DONOR CGI/UHTTPD TRACE'
+            echo '===================================='
+            echo
+            echo '== www/cgi-bin inventory =='
+            ls -la "$R/www/cgi-bin" 2>&1 || true
+            echo
+            echo '== luci CGI metadata =='
+            stat "$R/www/cgi-bin/luci" 2>&1 || true
+            file "$R/www/cgi-bin/luci" 2>&1 || true
+            readlink -f "$R/www/cgi-bin/luci" 2>&1 || true
+            echo
+            echo '== luci CGI first 80 lines / strings =='
+            sed -n '1,80p' "$R/www/cgi-bin/luci" 2>/dev/null || true
+            strings "$R/www/cgi-bin/luci" 2>/dev/null | head -120 || true
+            echo
+            echo '== /etc/config/uhttpd =='
+            sed -n '1,260p' "$R/etc/config/uhttpd" 2>&1 || true
+            echo
+            echo '== /etc/init.d/uhttpd =='
+            sed -n '1,360p' "$R/etc/init.d/uhttpd" 2>&1 || true
+            echo
+            echo '== uhttpd references =='
+            grep -rIna --binary-files=without-match -E 'cgi_prefix|cgi-bin|uhttpd|interpreter|lua_prefix|listen_http|listen_https|home'               "$R/etc" "$R/lib" "$R/usr" 2>/dev/null | head -2200 || true
+            echo
+            echo '== root index =='
+            stat "$R/www/index.html" 2>&1 || true
+            sed -n '1,180p' "$R/www/index.html" 2>&1 || true
+            echo
+            echo '== LuCI runtime files =='
+            ls -l "$R/usr/lib/lua/luci/dispatcher.lua" "$R/usr/lib/lua/luci/sgi/cgi.lua" "$R/usr/lib/lua/luci/cacheloader.lua" 2>&1 || true
+            echo
+            echo '== Lua / uhttpd binaries =='
+            file "$R/usr/bin/lua" "$R/usr/sbin/uhttpd" 2>&1 || true
+            ls -l "$R/usr/bin/lua" "$R/usr/sbin/uhttpd" 2>&1 || true
+          } > "$OUT"
+          sed -n '1,3200p' "$OUT"
+
+      - name: Persist CGI trace evidence
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          mv RE-LT500D-R25-DONOR-CGI-TRACE.txt evidence/
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/RE-LT500D-R25-DONOR-CGI-TRACE.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record LT500D donor CGI trace evidence'
+            git push origin HEAD:lt500d-r25-emulator-v1
+          fi
