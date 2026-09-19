@@ -3,6 +3,10 @@ name: LT500D R25 emulator gate
 permissions:
   contents: write
 
+concurrency:
+  group: lt500d-r25-emulator
+  cancel-in-progress: true
+
 on:
   push:
     branches:
