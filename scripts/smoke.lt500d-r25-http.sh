@@ -4,12 +4,15 @@ set -euo pipefail
 HTTP_BASE="${LT500D_HTTP_BASE:-http://127.0.0.1:8080}"
 HTTPS_BASE="${LT500D_HTTPS_BASE:-https://127.0.0.1:8443}"
 OUT="${1:-/tmp/lt500d-r25-http-body.bin}"
+COOKIE="${OUT}.cookies"
 
 probe_status() {
   local url="$1" body="$2" headers="$3" insecure="${4:-0}" status
-  local -a args=(-sS --connect-timeout 3 --max-time 15 -w '%{http_code}' -D "$headers" -o "$body")
-  [ "$insecure" = 1 ] && args=(-k "${args[@]}")
-  status="$(curl "${args[@]}" "$url" || true)"
+  if [ "$insecure" = 1 ]; then
+    status="$(curl -k -sS --connect-timeout 3 --max-time 15 -w '%{http_code}' -D "$headers" -o "$body" "$url" || true)"
+  else
+    status="$(curl -sS --connect-timeout 3 --max-time 15 -w '%{http_code}' -D "$headers" -o "$body" "$url" || true)"
+  fi
   printf '%s' "$status"
 }
 
@@ -29,17 +32,81 @@ root_status="$(probe_status "$HTTP_BASE/" "$OUT.root" "$OUT.root.headers")"
 }
 echo "PASS: donor root status=200 with LuCI redirect marker"
 
-echo "Probing donor LuCI CGI"
-luci_status="$(curl -sS -L --connect-timeout 3 --max-time 20 -w '%{http_code}' -D "$OUT.luci.headers" -o "$OUT.luci" "$HTTP_BASE/cgi-bin/luci/" || true)"
-case "$luci_status" in
-  200|301|302|303|307|308) ;;
-  *) echo "FAIL: LuCI final status=$luci_status"; exit 1 ;;
+root_luci_path="$(grep -Eo '/?cgi-bin/luci[^"'"'"'<>[:space:]]*' "$OUT.root" | head -n1 || true)"
+[ -n "$root_luci_path" ] || root_luci_path="/cgi-bin/luci/"
+case "$root_luci_path" in
+  /*) ;;
+  *) root_luci_path="/$root_luci_path" ;;
 esac
-[ -s "$OUT.luci" ] && grep -Eqi '<html|<!DOCTYPE|Cudy|LuCI|sysauth|login' "$OUT.luci" || {
-  echo "FAIL: LuCI response body is not recognizable HTML"
+
+echo "Probing donor LuCI locally while preserving canonical Host: cudy.net"
+: > "$COOKIE"
+current_scheme=http
+current_path="$root_luci_path"
+luci_ok=0
+
+hop=1
+while [ "$hop" -le 6 ]; do
+  if [ "$current_scheme" = https ]; then
+    local_url="$HTTPS_BASE$current_path"
+    status="$(curl -k -sS --connect-timeout 3 --max-time 20       -H 'Host: cudy.net' -b "$COOKIE" -c "$COOKIE"       -w '%{http_code}' -D "$OUT.luci.headers" -o "$OUT.luci" "$local_url" || true)"
+  else
+    local_url="$HTTP_BASE$current_path"
+    status="$(curl -sS --connect-timeout 3 --max-time 20       -H 'Host: cudy.net' -b "$COOKIE" -c "$COOKIE"       -w '%{http_code}' -D "$OUT.luci.headers" -o "$OUT.luci" "$local_url" || true)"
+  fi
+
+  echo "LuCI local hop $hop: $current_scheme://cudy.net$current_path -> $status"
+
+  case "$status" in
+    200|403)
+      if [ -s "$OUT.luci" ] &&
+         grep -Eqi '<html|<!DOCTYPE' "$OUT.luci" &&
+         grep -Eqi '/luci-static/light/|Cudy|sysauth|Quick Setup|setup\.css' "$OUT.luci"; then
+        if [ "$status" = 403 ]; then
+          echo "PASS: donor LuCI auth-gated Cudy/LEDE login HTML status=403"
+        else
+          echo "PASS: donor LuCI Cudy/LEDE HTML status=200"
+        fi
+        luci_ok=1
+      else
+        echo "FAIL: status=$status but response is not recognizable donor Cudy/LEDE HTML"
+      fi
+      break
+      ;;
+    301|302|303|307|308)
+      location="$(awk 'BEGIN{IGNORECASE=1} /^Location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print}' "$OUT.luci.headers" | tail -n1)"
+      echo "LuCI redirect -> $location"
+      case "$location" in
+        http://cudy.net/*)
+          current_scheme=http
+          current_path="/${location#http://cudy.net/}"
+          ;;
+        https://cudy.net/*)
+          current_scheme=https
+          current_path="/${location#https://cudy.net/}"
+          ;;
+        /*)
+          current_path="$location"
+          ;;
+        *)
+          echo "FAIL: refusing external or ambiguous LuCI redirect: $location"
+          break
+          ;;
+      esac
+      ;;
+    *)
+      echo "FAIL: LuCI local status=$status"
+      head -n 20 "$OUT.luci.headers" 2>/dev/null || true
+      break
+      ;;
+  esac
+  hop=$((hop + 1))
+done
+
+[ "$luci_ok" -eq 1 ] || {
+  echo "FAIL: no local LuCI redirect chain produced donor Cudy/LEDE HTML"
   exit 1
 }
-echo "PASS: LuCI final status=$luci_status"
 
 echo "Probing donor HTTPS static asset"
 https_status="$(probe_status "$HTTPS_BASE/luci-static/bootstrap/js/sysauth.js" "$OUT.https-static" "$OUT.https-static.headers" 1)"
