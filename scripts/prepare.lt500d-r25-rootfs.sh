@@ -13,8 +13,8 @@ from pathlib import Path
 import sys
 p=Path(sys.argv[1]); s=p.read_text()
 old='machine=$(awk \\'BEGIN{FS="[ \\\\t]+:[ \\\\t]"} /machine/ {print $2}\\' /proc/cpuinfo)'
-new=old+'\\n\\n\\t# LT500D emulator compatibility: Malta lacks the donor R25 identity.\\n\\t[ "$machine" = "MIPS Malta" ] && machine="R25"\\n\\t[ "$machine" = "mti,malta" ] && machine="R25"'
-if 'LT500D emulator compatibility: Malta' not in s:
+new=old+'\\n\\n\\t# LT500D emulator compatibility: explicit profile marker overrides Malta identity.\\n\\tgrep -qw "LT500D_EMU=R25" /proc/cmdline 2>/dev/null && machine="R25"'
+if 'LT500D emulator compatibility: explicit profile marker' not in s:
     if old not in s: raise SystemExit("ramips_board_detect signature not found; refusing blind patch")
     p.write_text(s.replace(old,new,1))
 PY
