@@ -34,13 +34,38 @@ BLOCKS=$((SIZE*1024))
 # unsquashfs on an unprivileged macOS host cannot be trusted to materialize
 # Linux character devices. Create the minimal early-boot nodes directly in
 # the ext2 image; debugfs edits the image file and does not require host mknod.
-ensure_node() {
-  local path="$1" type="$2" major="$3" minor="$4"
-  if ! "$DEBUGFS" -R "stat $path" "$FS" 2>&1 | grep -q "Inode:"; then
-    "$DEBUGFS" -w -R "mknod $path $type $major $minor" "$FS" >/dev/null 2>&1
+ensure_dir() {
+  local rel="${1#/}" out
+  out="$("$DEBUGFS" -R "stat $rel" "$FS" 2>&1 || true)"
+  if ! printf '%s\n' "$out" | grep -q "Inode:"; then
+    out="$("$DEBUGFS" -w -R "mkdir $rel" "$FS" 2>&1)" || {
+      echo "debugfs mkdir failed for /$rel"
+      printf '%s\n' "$out"
+      exit 1
+    }
   fi
-  "$DEBUGFS" -R "stat $path" "$FS" 2>&1 | grep -q "Inode:" || { echo "Failed to create $path"; exit 1; }
 }
+
+ensure_node() {
+  local path="$1" type="$2" major="$3" minor="$4" rel out
+  rel="${path#/}"
+  out="$("$DEBUGFS" -R "stat $rel" "$FS" 2>&1 || true)"
+  if ! printf '%s\n' "$out" | grep -q "Inode:"; then
+    out="$("$DEBUGFS" -w -R "mknod $rel $type $major $minor" "$FS" 2>&1)" || {
+      echo "debugfs mknod failed for $path"
+      printf '%s\n' "$out"
+      exit 1
+    }
+  fi
+  out="$("$DEBUGFS" -R "stat $rel" "$FS" 2>&1 || true)"
+  if ! printf '%s\n' "$out" | grep -q "Inode:"; then
+    echo "Failed to create $path"
+    printf '%s\n' "$out"
+    exit 1
+  fi
+}
+
+ensure_dir /dev
 ensure_node /dev/console c 5 1
 ensure_node /dev/null c 1 3
 ensure_node /dev/zero c 1 5
