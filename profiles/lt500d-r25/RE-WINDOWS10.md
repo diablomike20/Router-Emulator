@@ -2,7 +2,13 @@
 
 This is the Windows 10 host port for the Cudy LT500D V2 R25 donor emulator.
 
-The Windows-facing entry point is:
+The easiest Windows entry point is the double-click launcher:
+
+`.\scripts\RE-lt500d-r25.windows10.bat`
+
+It provides a menu for Setup, Check, Build, Start and Smoke, plus shortcuts to open the emulator HTTP/HTTPS pages.
+
+The PowerShell backend remains available directly as:
 
 `.\scripts\RE-lt500d-r25.windows10.ps1`
 
@@ -22,6 +28,33 @@ This keeps Windows on the same FirmAE/QEMU path used by the verified Linux CI, i
 - several GB free disk space
 
 The Cudy factory firmware is not bundled.
+
+## Double-click launcher
+
+Run:
+
+```text
+scripts\RE-lt500d-r25.windows10.bat
+```
+
+The menu offers:
+
+1. Setup WSL2 dependencies
+2. Check prerequisites
+3. Build emulator image
+4. Start emulator
+5. Smoke test
+6. Open HTTP page
+7. Open HTTPS page
+
+The BAT file can also be used from Command Prompt:
+
+```bat
+scripts\RE-lt500d-r25.windows10.bat Check
+scripts\RE-lt500d-r25.windows10.bat Build "C:\path\LT500V2-R25-2.4.16-20250804-150319-flash.bin"
+scripts\RE-lt500d-r25.windows10.bat Start
+scripts\RE-lt500d-r25.windows10.bat Smoke
+```
 
 ## Setup
 
