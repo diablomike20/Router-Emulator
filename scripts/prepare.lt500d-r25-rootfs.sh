@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text()
-old = r"""machine=$(awk 'BEGIN{FS="[ \\t]+:[ \\t]"} /machine/ {print $2}' /proc/cpuinfo)"""
+old = """machine=$(awk 'BEGIN{FS="[ \\t]+:[ \\t]"} /machine/ {print $2}' /proc/cpuinfo)"""
 marker = "LT500D emulator compatibility: explicit profile marker"
 if marker not in s:
     if old not in s:
@@ -27,7 +27,7 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text()
-old = r"""\tlocal mtdblock=$(find_mtd_part factory)
+old = """\tlocal mtdblock=$(find_mtd_part factory)
 \tlocal magic=$(hexdump -n 4 -e '4/1 "%02x"' $mtdblock)"""
 marker = "LT500D emulator compatibility: no factory MTD"
 if marker not in s:
