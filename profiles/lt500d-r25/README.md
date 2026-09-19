@@ -11,19 +11,20 @@ This branch turns the previously demonstrated FirmAE bring-up into an explicit L
 - R25 board identity and the missing factory-MTD dependency require compatibility handling.
 - Donor `uhttpd` has been observed bound to TCP 80/443.
 - Donor LAN remains `br-lan=192.168.10.1`.
-- A second emulator-only NIC (`eth1=10.0.2.15/24`) is used for host management.
-- The remaining observed blocker was donor firewall rejection of traffic entering through emulator-only eth1.
+- A second emulator-only NIC (`eth1`) is attached as a port of the donor `br-lan` bridge.
+- The donor keeps its original LAN identity: `br-lan=192.168.10.1/24`.
+- Host management reaches the guest through the donor LAN path rather than a synthetic management subnet.
 
 ## v1 management design
 
 `eth0` is reserved for donor networking and is not added to a new management bridge.
 
-`eth1` is an emulator-only management interface. `lt500d-r25-management.sh` assigns 10.0.2.15/24 and adds only an INPUT exception for TCP 80/443 on eth1.
+`eth1` is an emulator-only physical LAN attachment. `lt500d-r25-management.sh` gives it no L3 address and adds it to the donor-created `br-lan` bridge. No emulator-only firewall ACCEPT rule is installed; the donor LAN policy remains authoritative.
 
-The host launcher forwards:
+The host launcher uses a `192.168.10.0/24` QEMU user network and forwards:
 
-- http://127.0.0.1:8080 -> 10.0.2.15:80
-- https://127.0.0.1:8443 -> 10.0.2.15:443
+- http://127.0.0.1:8080 -> 192.168.10.1:80
+- https://127.0.0.1:8443 -> 192.168.10.1:443
 
 This is a **COMPATIBILITY_SHIMMED** path, not TARGET_VERIFIED and not a claim that MT7628 Ethernet/switch hardware is faithfully emulated.
 
@@ -36,8 +37,7 @@ flush the complete firewall.
 
 The stock FirmAE `scripts/network.sh` contains a generic loop that flushes
 iptables and sets INPUT ACCEPT. Do **not** use that generic firewall bypass as
-LT500D fidelity evidence. The LT500D profile deliberately limits the exception
-to emulator-only eth1 TCP 80/443.
+LT500D fidelity evidence. The LT500D profile no longer requires a separate eth1 firewall exception; management traffic enters through the donor `br-lan` path.
 
 ## macOS build path
 
