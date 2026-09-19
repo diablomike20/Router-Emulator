@@ -79,6 +79,23 @@ dump_diag() {
     route -n 2>&1 || true
     echo "[LT500D-EMU] listeners"
     netstat -lnt 2>&1 || true
+    echo "[LT500D-EMU] uhttpd process"
+    ps w 2>&1 | grep '[u]httpd' || true
+    for p in $(pidof uhttpd 2>/dev/null); do
+      echo "[LT500D-EMU] /proc/$p/cmdline"
+      tr '\000' ' ' < "/proc/$p/cmdline" 2>/dev/null || true
+      echo
+    done
+    echo "[LT500D-EMU] uhttpd UCI"
+    uci show uhttpd 2>&1 || true
+    echo "[LT500D-EMU] system UCI"
+    uci show system 2>&1 || true
+    echo "[LT500D-EMU] luci UCI"
+    uci show luci 2>&1 || true
+    echo "[LT500D-EMU] CGI metadata"
+    ls -l /www/cgi-bin/luci /usr/bin/lua /usr/lib/lua/luci/sgi/cgi.lua /usr/lib/lua/luci/sgi/uhttpd.lua 2>&1 || true
+    echo "[LT500D-EMU] LuCI Lua import smoke"
+    /usr/bin/lua -e 'require "luci.cacheloader"; require "luci.sgi.cgi"; io.write("LT500D_LUCI_LUA_IMPORT=PASS\\n")' 2>&1 || true
     if command -v iptables >/dev/null 2>&1; then
       echo "[LT500D-EMU] INPUT"
       iptables -nvL INPUT --line-numbers 2>&1 || true
