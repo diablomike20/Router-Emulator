@@ -1,0 +1,83 @@
+name: RE LT500D OpenWrt 23.05.5 emulator gate
+
+on:
+  push:
+    branches:
+      - lt500d-openwrt-23.05.5-emulator-v1
+    paths:
+      - 'scripts/RE-*openwrt-23.05.5*'
+      - 'profiles/lt500d-openwrt-23.05.5/**'
+      - '.github/workflows/RE-lt500d-openwrt-23.05.5-emulator-gate.yml'
+  workflow_dispatch:
+    inputs:
+      firmware_url:
+        description: 'Reachable URL for verified LT500D V2 OpenWrt 23.05.5 firmware (optional; enables runtime)'
+        required: false
+        type: string
+
+jobs:
+  static-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax and contract
+        run: |
+          set -euo pipefail
+          for f in scripts/RE-*openwrt-23.05.5*.sh; do bash -n "$f"; done
+          grep -q '3d8bb8eac7396f8263e90ecf14eca0f324ea6dbb295106e72b0a96753f31255b' scripts/RE-make.lt500d-openwrt-23.05.5-emulator.sh
+          grep -q 'LT500D_OWRT_EMU=1' scripts/RE-run.lt500d-openwrt-23.05.5.mipsel.sh
+          echo LT500D_OWRT_STATIC_LINUX_GATE=PASS
+
+  static-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell
+        shell: powershell
+        run: |
+          $tokens=$null; $errors=$null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'scripts/RE-lt500d-openwrt-23.05.5.windows.ps1'),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){ $errors | Format-List | Out-String | Write-Host; throw 'PowerShell parse failed' }
+          Write-Host 'LT500D_OWRT_WINDOWS_PS_GATE=PASS'
+      - name: BAT selftest
+        shell: cmd
+        run: scripts\RE-lt500d-openwrt-23.05.5.windows.bat --selftest
+
+  runtime-linux:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.firmware_url != '' }}
+    needs: [static-linux, static-windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 perl libdigest-sha-perl ca-certificates file binutils
+      - name: Download verified firmware
+        env:
+          FW_URL: ${{ inputs.firmware_url }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/lt500d-openwrt.bin "$FW_URL"
+          test "$(stat -c %s /tmp/lt500d-openwrt.bin)" = 9306901
+          echo '3d8bb8eac7396f8263e90ecf14eca0f324ea6dbb295106e72b0a96753f31255b  /tmp/lt500d-openwrt.bin' | sha256sum -c -
+      - name: Build image
+        run: |
+          chmod +x scripts/RE-*.sh scripts/preInit.sh scripts/run_service.sh
+          bash scripts/RE-make.lt500d-openwrt-23.05.5-emulator.sh /tmp/lt500d-openwrt.bin scratch/lt500d-openwrt-ci
+      - name: Boot and smoke
+        run: |
+          set -euo pipefail
+          bash scripts/RE-start.lt500d-openwrt-23.05.5.sh scratch/lt500d-openwrt-ci/image.raw &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 120); do
+            if curl -fsS --connect-timeout 1 --max-time 2 http://127.0.0.1:18080/luci-static/resources/luci.js >/dev/null 2>&1; then ready=1; break; fi
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          test "$ready" = 1
+          bash scripts/RE-smoke.lt500d-openwrt-23.05.5.sh /tmp/RE-lt500d-owrt-ci
+          echo LT500D_OPENWRT_RUNTIME_GATE=PASS
