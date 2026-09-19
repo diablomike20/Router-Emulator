@@ -1,0 +1,201 @@
+name: RE LT500D R25 emulator release v1.0.1
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - lt500d-r25-emulator-v1
+    paths:
+      - ".github/workflows/RE-lt500d-r25-release-v1.0.1.yml"
+
+env:
+  RELEASE_TAG: lt500d-r25-emulator-v1.0.1
+  RELEASE_NAME: RE-LT500D-R25-EMULATOR-v1.0.1
+  DONOR_URL: https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip?v=5016960833307663900
+  DONOR_SHA: 57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6
+
+jobs:
+  windows-static:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell launcher
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          $file = Resolve-Path "scripts/RE-lt500d-r25.windows10.ps1"
+          [void][System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Host
+            throw "PowerShell parse failed"
+          }
+          Write-Host "WINDOWS_POWERSHELL_STATIC_GATE=PASS"
+      - name: Check BAT launcher
+        shell: cmd
+        run: scripts\RE-lt500d-r25.windows10.bat --selftest
+
+  linux-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 perl libdigest-sha-perl ca-certificates file binutils
+      - name: Download verified donor
+        run: |
+          set -euo pipefail
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/r25.zip "$DONOR_URL"
+          mkdir -p /tmp/r25-fw
+          unzip -j /tmp/r25.zip -d /tmp/r25-fw
+          FLASH="$(find /tmp/r25-fw -type f -name '*flash.bin' | head -1)"
+          test "$(stat -c %s "$FLASH")" = 12124315
+          echo "$DONOR_SHA  $FLASH" | sha256sum -c -
+          cp "$FLASH" /tmp/r25.bin
+      - name: Linux build
+        run: |
+          chmod +x scripts/*.sh
+          bash scripts/RE-lt500d-r25.linux.sh Build /tmp/r25.bin scratch/release-linux
+      - name: Linux boot and smoke
+        run: |
+          set -euo pipefail
+          bash scripts/RE-lt500d-r25.linux.sh Start scratch/release-linux/image.raw &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 90); do
+            if curl -fsS --connect-timeout 1 --max-time 2 http://127.0.0.1:8080/luci-static/bootstrap/js/sysauth.js >/dev/null 2>&1; then ready=1; break; fi
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          test "$ready" = 1
+          bash scripts/RE-lt500d-r25.linux.sh Smoke
+          echo "LINUX_RUNTIME_GATE=PASS"
+
+  macos-runtime:
+    runs-on: macos-13
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install macOS dependencies
+        run: |
+          brew install qemu squashfs e2fsprogs
+      - name: Download verified donor
+        run: |
+          set -euo pipefail
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/r25.zip "$DONOR_URL"
+          mkdir -p /tmp/r25-fw
+          unzip -j /tmp/r25.zip -d /tmp/r25-fw
+          FLASH="$(find /tmp/r25-fw -type f -name '*flash.bin' | head -1)"
+          test "$(wc -c < "$FLASH" | tr -d ' ')" = 12124315
+          test "$(shasum -a 256 "$FLASH" | awk '{print $1}')" = "$DONOR_SHA"
+          cp "$FLASH" /tmp/r25.bin
+      - name: macOS build
+        run: |
+          chmod +x scripts/*.sh
+          bash scripts/RE-lt500d-r25.macos.sh Build /tmp/r25.bin scratch/release-macos
+      - name: macOS boot and smoke
+        run: |
+          set -euo pipefail
+          bash scripts/RE-lt500d-r25.macos.sh Start scratch/release-macos/image.raw &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 90); do
+            if curl -fsS --connect-timeout 1 --max-time 2 http://127.0.0.1:8080/luci-static/bootstrap/js/sysauth.js >/dev/null 2>&1; then ready=1; break; fi
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          test "$ready" = 1
+          bash scripts/RE-lt500d-r25.macos.sh Smoke
+          echo "MACOS_RUNTIME_GATE=PASS"
+
+  package-release:
+    needs: [windows-static, linux-runtime, macos-runtime]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build platform archives
+        run: |
+          set -euo pipefail
+          DIST=dist
+          mkdir -p "$DIST"
+
+          COMMON="assemble.lt500d-r25-guest.sh bootstrap.lt500d-r25.macos.sh build.lt500d-r25-image.macos.sh check.lt500d-r25-macos.sh lt500d-r25-management.sh make.lt500d-r25-emulator.macos.sh prepare.lt500d-r25-rootfs.sh verify.lt500d-r25-rootfs.sh run.lt500d-r25.mipsel.sh smoke.lt500d-r25-http.sh start.lt500d-r25.sh preInit.sh run_service.sh"
+
+          make_pkg() {
+            os="$1"
+            root="$DIST/$RELEASE_NAME-$os"
+            mkdir -p "$root/scripts" "$root/profiles/lt500d-r25" "$root/evidence"
+            for f in $COMMON; do cp "scripts/$f" "$root/scripts/"; done
+            cp profiles/lt500d-r25/README.md "$root/profiles/lt500d-r25/"
+            [ -f evidence/RE-LT500D-R25-EMULATOR-CI-RESULT.md ] && cp evidence/RE-LT500D-R25-EMULATOR-CI-RESULT.md "$root/evidence/" || true
+          }
+
+          make_pkg linux-x86_64
+          cp scripts/RE-lt500d-r25.linux.sh "$DIST/$RELEASE_NAME-linux-x86_64/scripts/"
+
+          make_pkg macos-x86_64
+          cp scripts/RE-lt500d-r25.macos.sh "$DIST/$RELEASE_NAME-macos-x86_64/scripts/"
+
+          make_pkg windows10-wsl2-x86_64
+          cp scripts/RE-lt500d-r25.windows10.ps1 "$DIST/$RELEASE_NAME-windows10-wsl2-x86_64/scripts/"
+          cp scripts/RE-lt500d-r25.windows10.bat "$DIST/$RELEASE_NAME-windows10-wsl2-x86_64/scripts/"
+          cp profiles/lt500d-r25/RE-WINDOWS10.md "$DIST/$RELEASE_NAME-windows10-wsl2-x86_64/profiles/lt500d-r25/"
+
+          for root in "$DIST"/"$RELEASE_NAME"-*; do
+            cat > "$root/RE-RELEASE-RUNTIME-VERIFICATION.txt" <<EOF
+release=$RELEASE_NAME
+source_commit=$GITHUB_SHA
+donor_sha256=$DONOR_SHA
+linux_runtime_ci=PASS
+macos_runtime_ci=PASS
+windows_launcher_static_ci=PASS
+windows_runtime=WSL2_REQUIRED
+fidelity=COMPATIBILITY_SHIMMED
+EOF
+            chmod +x "$root"/scripts/*.sh
+            (cd "$DIST" && zip -qr "$(basename "$root").zip" "$(basename "$root")")
+          done
+
+          cd "$DIST"
+          sha256sum "$RELEASE_NAME"-*.zip > "$RELEASE_NAME-SHA256SUMS.txt"
+          cat "$RELEASE_NAME-SHA256SUMS.txt"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/notes.md <<'EOF'
+# RE-LT500D-R25-EMULATOR v1.0.1
+
+Three host-specific packages are provided:
+
+- Linux x86_64
+- macOS x86_64
+- Windows 10/11 x86_64 via WSL2
+
+## v1.0.1 changes
+
+- Windows launcher now detects installed WSL distributions instead of assuming a usable default.
+- Missing Ubuntu/WSL setup now produces actionable installation instructions instead of a PowerShell stack trace.
+- Release packaging now includes the required `verify.lt500d-r25-rootfs.sh`.
+- Linux and macOS receive single-entry Setup/Check/Build/Start/Smoke wrappers.
+- Linux and macOS are runtime-gated independently before publication.
+- Windows BAT and PowerShell launchers are syntax/static-gated; Windows runtime requires a local WSL2 installation.
+
+Factory Cudy firmware is not redistributed.
+
+Emulator LAN: `192.168.10.2/24`.
+Host HTTP: `127.0.0.1:8080`.
+Host HTTPS: `127.0.0.1:8443`.
+
+Fidelity: `COMPATIBILITY_SHIMMED`.
+EOF
+          gh release create "$RELEASE_TAG"             dist/"$RELEASE_NAME"-linux-x86_64.zip             dist/"$RELEASE_NAME"-macos-x86_64.zip             dist/"$RELEASE_NAME"-windows10-wsl2-x86_64.zip             dist/"$RELEASE_NAME"-SHA256SUMS.txt             --target "$GITHUB_SHA"             --title "$RELEASE_NAME"             --notes-file /tmp/notes.md             --repo "$GITHUB_REPOSITORY"
+          echo "RELEASE_V101_PUBLISH_GATE=PASS"
