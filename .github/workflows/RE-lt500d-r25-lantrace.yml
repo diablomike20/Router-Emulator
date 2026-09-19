@@ -1,0 +1,88 @@
+name: RE LT500D donor LAN trace
+
+permissions:
+  contents: write
+
+concurrency:
+  group: re-lt500d-lantrace
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - lt500d-r25-emulator-v1
+    paths:
+      - ".github/workflows/RE-lt500d-r25-lantrace.yml"
+
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install trace dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools unzip curl binutils
+
+      - name: Download and verify official donor
+        run: |
+          set -euo pipefail
+          URL='https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip?v=5016960833307663900'
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/r25.zip "$URL"
+          mkdir -p /tmp/r25-fw
+          unzip -j /tmp/r25.zip -d /tmp/r25-fw
+          FLASH="$(find /tmp/r25-fw -type f -name '*flash.bin' | head -1)"
+          test "$(stat -c %s "$FLASH")" = "12124315"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
+          cp "$FLASH" /tmp/r25.bin
+
+      - name: Extract and trace LAN source
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/lantrace
+          mkdir -p /tmp/lantrace/root
+          dd if=/tmp/r25.bin of=/tmp/lantrace/root.squashfs bs=1 skip=$((0x2a7d4d)) status=none
+          unsquashfs -d /tmp/lantrace/root /tmp/lantrace/root.squashfs >/tmp/lantrace/unsquash.log 2>&1 || true
+          OUT=RE-LT500D-R25-DONOR-LAN-TRACE.txt
+          {
+            echo 'RE LT500D R25 DONOR LAN TRACE'
+            echo '================================'
+            echo
+            echo '== direct literal files: 192.168.10.1 =='
+            grep -RIl -a '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null || true
+            echo
+            echo '== direct textual hits: 192.168.10.1 =='
+            grep -RIna --binary-files=without-match '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null || true
+            echo
+            echo '== direct DHCP-range hits =='
+            grep -RIna --binary-files=without-match -E '192\.168\.10\.(10|250)' /tmp/lantrace/root 2>/dev/null || true
+            echo
+            echo '== network/bootstrap references =='
+            grep -RIna --binary-files=without-match -E 'br-lan|eth0\.1|network\.lan|lan\.ipaddr|option[[:space:]]+ipaddr|uci[^[:space:]]*[[:space:]].*network'               /tmp/lantrace/root/etc /tmp/lantrace/root/lib /tmp/lantrace/root/usr 2>/dev/null | head -2000 || true
+            echo
+            echo '== config/bootstrap inventory =='
+            find /tmp/lantrace/root/etc /tmp/lantrace/root/lib -maxdepth 5 -type f               \( -path '*/config/*' -o -path '*/uci-defaults/*' -o -path '*/board.d/*' -o -path '*/preinit/*' -o -path '*/init.d/*' -o -name '*network*' \)               -print 2>/dev/null | sort
+            echo
+            echo '== strings around literal in matching files =='
+            grep -RIl -a '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null |
+            while IFS= read -r p; do
+              echo "--- $p ---"
+              strings "$p" 2>/dev/null | grep -n -C 12 -E '192\.168\.10\.1|192\.168\.10\.(10|250)|br-lan|eth0\.1|network\.lan|ipaddr' | head -160 || true
+            done
+          } > "$OUT"
+          sed -n '1,2600p' "$OUT"
+
+      - name: Persist LAN trace evidence
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          mv RE-LT500D-R25-DONOR-LAN-TRACE.txt evidence/
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/RE-LT500D-R25-DONOR-LAN-TRACE.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record LT500D donor LAN trace evidence'
+            git push origin HEAD:lt500d-r25-emulator-v1
+          fi
