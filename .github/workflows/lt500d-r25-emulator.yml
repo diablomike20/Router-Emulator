@@ -109,6 +109,13 @@ jobs:
               status="$(curl -sS -L --connect-timeout 1 --max-time 15 -w '%{http_code}'                 -D "/tmp/lt500d-r25-luci${safe}.headers"                 -o "/tmp/lt500d-r25-luci${safe}.bin"                 "http://127.0.0.1:8080$candidate" || true)"
               printf '%s %s\n' "$status" "$candidate" >> /tmp/lt500d-r25-luci-attempts.txt
               echo "LuCI candidate $candidate -> $status"
+              if [ "$status" != "200" ]; then
+                echo "--- LuCI candidate body head: $candidate ---"
+                head -c 900 "/tmp/lt500d-r25-luci${safe}.bin" 2>/dev/null || true
+                echo
+                echo "--- LuCI candidate headers: $candidate ---"
+                head -n 20 "/tmp/lt500d-r25-luci${safe}.headers" 2>/dev/null || true
+              fi
               if [ "$status" = "200" ] &&
                  [ -s "/tmp/lt500d-r25-luci${safe}.bin" ] &&
                  grep -Eqi '<html|<!DOCTYPE|Cudy|sysauth|login|Dashboard' "/tmp/lt500d-r25-luci${safe}.bin"; then
