@@ -10,9 +10,9 @@ This branch turns the previously demonstrated FirmAE bring-up into an explicit L
 - Root filesystem mounts and donor init reaches `procd`.
 - R25 board identity and the missing factory-MTD dependency require compatibility handling.
 - Donor `uhttpd` has been observed bound to TCP 80/443.
-- Donor LAN remains `br-lan=192.168.10.1`.
+- The emulator copy rewrites only the donor LAN address to `br-lan=192.168.10.2` to avoid colliding with the physical router at `192.168.10.1`.
 - A second emulator-only NIC (`eth1`) is attached as a port of the donor `br-lan` bridge.
-- The donor keeps its original LAN identity: `br-lan=192.168.10.1/24`.
+- The donor LAN topology is retained, but the emulator-only copy uses `br-lan=192.168.10.2/24`.
 - Host management reaches the guest through the donor LAN path rather than a synthetic management subnet.
 
 ## v1 management design
@@ -23,8 +23,8 @@ This branch turns the previously demonstrated FirmAE bring-up into an explicit L
 
 The host launcher uses a `192.168.10.0/24` QEMU user network and forwards:
 
-- http://127.0.0.1:8080 -> 192.168.10.1:80
-- https://127.0.0.1:8443 -> 192.168.10.1:443
+- http://127.0.0.1:8080 -> 192.168.10.2:80
+- https://127.0.0.1:8443 -> 192.168.10.2:443
 
 This is a **COMPATIBILITY_SHIMMED** path, not TARGET_VERIFIED and not a claim that MT7628 Ethernet/switch hardware is faithfully emulated.
 
