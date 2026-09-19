@@ -19,7 +19,7 @@ This branch turns the previously demonstrated FirmAE bring-up into an explicit L
 
 `eth0` is reserved for donor networking and is not added to a new management bridge.
 
-`eth1` is an emulator-only physical LAN attachment. `lt500d-r25-management.sh` gives it no L3 address and adds it to the donor-created `br-lan` bridge. No emulator-only firewall ACCEPT rule is installed; the donor LAN policy remains authoritative.
+`eth1` is an emulator-only physical LAN attachment. `lt500d-r25-management.sh` gives it no L3 address and adds it to the donor-created `br-lan` bridge. The emulator copy patches the donor first-boot LAN default in `/etc/uci-defaults/01_network` from `192.168.10.1` to `192.168.10.2`. Under FirmAE the observed INPUT/OUTPUT chains can remain empty with policy DROP, so the shim reasserts only TCP 80/443 permits between `br-lan` and the emulator-only QEMU host endpoint `192.168.10.254`; it never flushes the donor firewall or enables general LAN access.
 
 The host launcher uses a `192.168.10.0/24` QEMU user network and forwards:
 
@@ -37,7 +37,7 @@ flush the complete firewall.
 
 The stock FirmAE `scripts/network.sh` contains a generic loop that flushes
 iptables and sets INPUT ACCEPT. Do **not** use that generic firewall bypass as
-LT500D fidelity evidence. The LT500D profile no longer requires a separate eth1 firewall exception; management traffic enters through the donor `br-lan` path.
+LT500D fidelity evidence. The LT500D profile does not use the old eth1 management-subnet exception. Management enters through donor `br-lan`; only the emulator-only host endpoint `192.168.10.254` is permitted to TCP 80/443 when FirmAE leaves the donor filter chains empty/DROP.
 
 ## macOS build path
 
