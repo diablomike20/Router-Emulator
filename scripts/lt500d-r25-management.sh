@@ -81,6 +81,15 @@ dump_diag() {
     netstat -lnt 2>&1 || true
     echo "[LT500D-EMU] uhttpd process"
     ps w 2>&1 | grep '[u]httpd' || true
+    echo "[LT500D-EMU] uhttpd UCI"
+    uci show uhttpd 2>&1 || true
+    echo "[LT500D-EMU] LuCI handler files"
+    ls -l /www/cgi-bin/luci /usr/lib/lua/luci/sgi/uhttpd.lua /usr/lib/lua/luci/sgi/cgi.lua 2>&1 || true
+    echo "[LT500D-EMU] LuCI cache/index"
+    ls -l /tmp/luci-indexcache /tmp/luci-modulecache 2>&1 || true
+    [ -f /tmp/luci-indexcache ] && { wc -c /tmp/luci-indexcache; head -c 256 /tmp/luci-indexcache | strings; } 2>&1 || true
+    echo "[LT500D-EMU] uhttpd process"
+    ps w 2>&1 | grep '[u]httpd' || true
     for p in $(pidof uhttpd 2>/dev/null); do
       echo "[LT500D-EMU] /proc/$p/cmdline"
       tr '\000' ' ' < "/proc/$p/cmdline" 2>/dev/null || true
