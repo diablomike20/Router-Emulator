@@ -1,0 +1,190 @@
+name: RE LT500D R25 emulator release v1.0.0
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - lt500d-r25-emulator-v1
+    paths:
+      - ".github/workflows/RE-lt500d-r25-release-v1.yml"
+
+env:
+  RELEASE_TAG: lt500d-r25-emulator-v1.0.0
+  RELEASE_NAME: RE-LT500D-R25-EMULATOR-v1.0.0
+
+jobs:
+  windows-powershell-static:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse Windows 10 PowerShell port
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          $file = Resolve-Path "scripts/RE-lt500d-r25.windows10.ps1"
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            $file, [ref]$tokens, [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Host
+            throw "PowerShell parse failed"
+          }
+          Write-Host "WINDOWS10_POWERSHELL_STATIC_GATE=PASS"
+
+  linux-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 libdigest-sha-perl
+
+      - name: Download and verify official donor
+        run: |
+          set -euo pipefail
+          URL='https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip?v=5016960833307663900'
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/r25.zip "$URL"
+          mkdir -p /tmp/r25-fw
+          unzip -j /tmp/r25.zip -d /tmp/r25-fw
+          FLASH="$(find /tmp/r25-fw -type f -name '*flash.bin' | head -1)"
+          test "$(stat -c %s "$FLASH")" = "12124315"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
+          cp "$FLASH" /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin
+
+      - name: Build current release image
+        run: |
+          set -euo pipefail
+          bash scripts/make.lt500d-r25-emulator.macos.sh \
+            /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin \
+            scratch/release-r25
+
+      - name: Boot and run repository smoke gate
+        run: |
+          set -euo pipefail
+          bash scripts/start.lt500d-r25.sh scratch/release-r25/image.raw &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+
+          ready=0
+          for i in $(seq 1 90); do
+            if curl -fsS --connect-timeout 1 --max-time 2 \
+              http://127.0.0.1:8080/luci-static/bootstrap/js/sysauth.js >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          test "$ready" = 1
+          bash scripts/smoke.lt500d-r25-http.sh /tmp/RE-release-smoke
+          echo "RELEASE_RUNTIME_GATE=PASS"
+
+  package-release:
+    needs:
+      - windows-powershell-static
+      - linux-runtime
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release archive
+        run: |
+          set -euo pipefail
+          ROOT="dist/$RELEASE_NAME"
+          mkdir -p "$ROOT/scripts" "$ROOT/profiles/lt500d-r25" "$ROOT/evidence"
+
+          for f in \
+            assemble.lt500d-r25-guest.sh \
+            bootstrap.lt500d-r25.macos.sh \
+            build.lt500d-r25-image.macos.sh \
+            check.lt500d-r25-macos.sh \
+            lt500d-r25-management.sh \
+            make.lt500d-r25-emulator.macos.sh \
+            prepare.lt500d-r25-rootfs.sh \
+            run.lt500d-r25.mipsel.sh \
+            smoke.lt500d-r25-http.sh \
+            start.lt500d-r25.sh
+          do
+            cp "scripts/$f" "$ROOT/scripts/"
+          done
+
+          cp scripts/RE-lt500d-r25.windows10.ps1 "$ROOT/scripts/"
+          cp profiles/lt500d-r25/README.md "$ROOT/profiles/lt500d-r25/"
+          cp profiles/lt500d-r25/RE-WINDOWS10.md "$ROOT/profiles/lt500d-r25/"
+
+          if [ -f evidence/RE-LT500D-R25-EMULATOR-CI-RESULT.md ]; then
+            cp evidence/RE-LT500D-R25-EMULATOR-CI-RESULT.md "$ROOT/evidence/"
+          fi
+
+          cat > "$ROOT/RE-RELEASE-RUNTIME-VERIFICATION.txt" <<EOF
+          release=$RELEASE_NAME
+          source_commit=$GITHUB_SHA
+          windows_powershell_static=PASS
+          linux_runtime_gate=PASS
+          donor_sha256=57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6
+          fidelity=COMPATIBILITY_SHIMMED
+          EOF
+
+          chmod +x "$ROOT"/scripts/*.sh
+          cd dist
+          zip -qr "$RELEASE_NAME.zip" "$RELEASE_NAME"
+          sha256sum "$RELEASE_NAME.zip" > "$RELEASE_NAME.zip.sha256"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ZIP="dist/$RELEASE_NAME.zip"
+          SUM="dist/$RELEASE_NAME.zip.sha256"
+
+          cat > /tmp/RE-release-notes.md <<'EOF'
+          # RE-LT500D-R25-EMULATOR v1.0.0
+
+          First release checkpoint of the Cudy LT500D V2 R25 donor emulator.
+
+          The factory firmware is not redistributed.
+
+          ## Host OS
+
+          - Ubuntu 24.04 x86_64: runtime CI verified.
+          - macOS x86_64: dedicated mountless build/launch path included.
+          - Windows 10 x64: WSL2 PowerShell port included.
+          - Native Windows without WSL2: not part of v1.0.0.
+
+          ## Verified donor
+
+          SHA-256:
+          `57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6`
+
+          ## Runtime gates
+
+          The release is published only after donor firmware verification, image build, QEMU boot, HTTP/LuCI auth page, HTTPS and repository smoke gates pass.
+
+          Emulator LAN: `192.168.10.2/24`.
+
+          Fidelity: `COMPATIBILITY_SHIMMED`.
+          EOF
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ZIP" "$SUM" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_NAME" \
+              --notes-file /tmp/RE-release-notes.md \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "$ZIP" "$SUM" \
+              --target "$GITHUB_SHA" \
+              --title "$RELEASE_NAME" \
+              --notes-file /tmp/RE-release-notes.md \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+
+          echo "RELEASE_PUBLISH_GATE=PASS"
