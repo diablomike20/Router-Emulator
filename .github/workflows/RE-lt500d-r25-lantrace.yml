@@ -51,22 +51,22 @@ jobs:
             echo '================================'
             echo
             echo '== direct literal files: 192.168.10.1 =='
-            grep -RIl -a '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null || true
+            grep -rIl -a '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null || true
             echo
             echo '== direct textual hits: 192.168.10.1 =='
-            grep -RIna --binary-files=without-match '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null || true
+            grep -rIna --binary-files=without-match '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null || true
             echo
             echo '== direct DHCP-range hits =='
-            grep -RIna --binary-files=without-match -E '192\.168\.10\.(10|250)' /tmp/lantrace/root 2>/dev/null || true
+            grep -rIna --binary-files=without-match -E '192\.168\.10\.(10|250)' /tmp/lantrace/root 2>/dev/null || true
             echo
             echo '== network/bootstrap references =='
-            grep -RIna --binary-files=without-match -E 'br-lan|eth0\.1|network\.lan|lan\.ipaddr|option[[:space:]]+ipaddr|uci[^[:space:]]*[[:space:]].*network'               /tmp/lantrace/root/etc /tmp/lantrace/root/lib /tmp/lantrace/root/usr 2>/dev/null | head -2000 || true
+            grep -rIna --binary-files=without-match -E 'br-lan|eth0\.1|network\.lan|lan\.ipaddr|option[[:space:]]+ipaddr|uci[^[:space:]]*[[:space:]].*network'               /tmp/lantrace/root/etc /tmp/lantrace/root/lib /tmp/lantrace/root/usr 2>/dev/null | head -2000 || true
             echo
             echo '== config/bootstrap inventory =='
             find /tmp/lantrace/root/etc /tmp/lantrace/root/lib -maxdepth 5 -type f               \( -path '*/config/*' -o -path '*/uci-defaults/*' -o -path '*/board.d/*' -o -path '*/preinit/*' -o -path '*/init.d/*' -o -name '*network*' \)               -print 2>/dev/null | sort
             echo
             echo '== strings around literal in matching files =='
-            grep -RIl -a '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null |
+            grep -rIl -a '192\.168\.10\.1' /tmp/lantrace/root 2>/dev/null |
             while IFS= read -r p; do
               echo "--- $p ---"
               strings "$p" 2>/dev/null | grep -n -C 12 -E '192\.168\.10\.1|192\.168\.10\.(10|250)|br-lan|eth0\.1|network\.lan|ipaddr' | head -160 || true
