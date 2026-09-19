@@ -78,22 +78,55 @@ jobs:
 
           root_ok=0
           luci_ok=0
+          https_ok=0
+          lan_ok=0
           if [ "$transport_ok" -eq 1 ]; then
             echo "Probing donor root"
-            if curl -sS --connect-timeout 1 --max-time 10 -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/ &&
-               grep -q 'cgi-bin/luci/' /tmp/lt500d-r25-http-body.bin; then
+            root_status="$(curl -sS --connect-timeout 1 --max-time 10 -w '%{http_code}' -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/ || true)"
+            echo "$root_status" > /tmp/lt500d-r25-root.status
+            if [ "$root_status" = "200" ] && grep -q 'cgi-bin/luci/' /tmp/lt500d-r25-http-body.bin; then
               root_ok=1
-              echo "LT500D_ROOT_REDIRECT_GATE=PASS"
+              echo "LT500D_ROOT_REDIRECT_GATE=PASS status=$root_status"
             fi
 
             echo "Probing donor LuCI CGI"
-            if curl -sS -L --connect-timeout 1 --max-time 15 -D /tmp/lt500d-r25-luci.bin.headers -o /tmp/lt500d-r25-luci.bin http://127.0.0.1:8080/cgi-bin/luci/ &&
-               [ -s /tmp/lt500d-r25-luci.bin ] &&
-               grep -Eqi '<html|<!DOCTYPE|Cudy|LuCI|sysauth|login' /tmp/lt500d-r25-luci.bin; then
-              luci_ok=1
-              echo "LT500D_LUCI_CGI_GATE=PASS"
-              head -n 1 /tmp/lt500d-r25-luci.bin.headers || true
-              wc -c /tmp/lt500d-r25-luci.bin
+            luci_status="$(curl -sS -L --connect-timeout 1 --max-time 15 -w '%{http_code}' -D /tmp/lt500d-r25-luci.bin.headers -o /tmp/lt500d-r25-luci.bin http://127.0.0.1:8080/cgi-bin/luci/ || true)"
+            echo "$luci_status" > /tmp/lt500d-r25-luci.status
+            case "$luci_status" in
+              200|301|302|303|307|308)
+                if [ -s /tmp/lt500d-r25-luci.bin ] &&
+                   grep -Eqi '<html|<!DOCTYPE|Cudy|LuCI|sysauth|login' /tmp/lt500d-r25-luci.bin; then
+                  luci_ok=1
+                  echo "LT500D_LUCI_CGI_GATE=PASS final_status=$luci_status"
+                  head -n 8 /tmp/lt500d-r25-luci.bin.headers || true
+                  wc -c /tmp/lt500d-r25-luci.bin
+                fi
+                ;;
+              403)
+                echo "LT500D_LUCI_CGI_GATE=FAIL forbidden"
+                ;;
+              5??)
+                echo "LT500D_LUCI_CGI_GATE=FAIL server_error=$luci_status"
+                ;;
+              *)
+                echo "LT500D_LUCI_CGI_GATE=FAIL status=$luci_status"
+                ;;
+            esac
+
+            echo "Probing donor HTTPS static asset"
+            https_status="$(curl -k -sS --connect-timeout 1 --max-time 10 -w '%{http_code}' -D /tmp/lt500d-r25-https.bin.headers -o /tmp/lt500d-r25-https.bin https://127.0.0.1:8443/luci-static/bootstrap/js/sysauth.js || true)"
+            echo "$https_status" > /tmp/lt500d-r25-https.status
+            if [ "$https_status" = "200" ] && [ -s /tmp/lt500d-r25-https.bin ]; then
+              https_ok=1
+              echo "LT500D_HTTPS_GATE=PASS status=$https_status"
+            else
+              echo "LT500D_HTTPS_GATE=FAIL status=$https_status"
+            fi
+
+            if grep -q 'LT500D_LAN_UCI_GATE=PASS network.lan.ipaddr=192.168.10.2' scratch/lt500d-r25/qemu.serial.log &&
+               grep -q 'LT500D_LAN_IP_GATE=PASS br-lan=192.168.10.2' scratch/lt500d-r25/qemu.serial.log; then
+              lan_ok=1
+              echo "LT500D_LAN_RUNTIME_GATE=PASS"
             fi
           fi
 
@@ -111,11 +144,21 @@ jobs:
             exit 1
           fi
           if [ "$luci_ok" -ne 1 ]; then
-            echo "FAIL: donor LuCI CGI did not return recognizable HTML"
+            echo "FAIL: donor LuCI CGI did not return an allowed non-error status with recognizable HTML"
+            exit 1
+          fi
+          if [ "$https_ok" -ne 1 ]; then
+            echo "FAIL: donor HTTPS static asset unavailable"
+            exit 1
+          fi
+          if [ "$lan_ok" -ne 1 ]; then
+            echo "FAIL: runtime LAN identity is not verified as 192.168.10.2"
             exit 1
           fi
 
           echo "LT500D_HTTP_GATE=PASS"
+          echo "LT500D_HTTPS_GATE=PASS"
+          echo "LT500D_EMULATOR_GATE=PASS"
 
       - name: Stop QEMU
         if: always()
@@ -164,6 +207,14 @@ jobs:
               echo '```'
             fi
             echo
+            echo '## Gate status'
+            echo '```text'
+            [ -f /tmp/lt500d-r25-root.status ] && echo "root=$(cat /tmp/lt500d-r25-root.status)"
+            [ -f /tmp/lt500d-r25-luci.status ] && echo "luci_final=$(cat /tmp/lt500d-r25-luci.status)"
+            [ -f /tmp/lt500d-r25-https.status ] && echo "https_static=$(cat /tmp/lt500d-r25-https.status)"
+            grep -E 'LT500D_(LAN_UCI|LAN_IP)_GATE=PASS' "$SERIAL" | tail -n 4 || true
+            echo '```'
+            echo
             echo '## Serial tail'
             echo '```text'
             tail -n 220 "$SERIAL"
@@ -190,3 +241,8 @@ jobs:
             /tmp/lt500d-r25-static.bin.headers
             /tmp/lt500d-r25-luci.bin
             /tmp/lt500d-r25-luci.bin.headers
+            /tmp/lt500d-r25-luci.status
+            /tmp/lt500d-r25-root.status
+            /tmp/lt500d-r25-https.bin
+            /tmp/lt500d-r25-https.bin.headers
+            /tmp/lt500d-r25-https.status
