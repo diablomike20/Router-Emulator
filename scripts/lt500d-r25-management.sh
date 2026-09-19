@@ -93,14 +93,27 @@ dump_diag() {
   } > /dev/console 2>&1 || true
 }
 
-# netifd may rebuild the bridge during late boot. Reassert only eth1 membership;
-# UCI now owns the .2 address, so normal donor reloads retain it.
+# netifd/firewall may reload during late boot. Reassert only emulator LAN
+# attachment and the minimum host-management permits.  FirmAE does not
+# reproduce the donor's populated LAN firewall chains here; the observed
+# chains are empty with policy DROP.  Permit only QEMU's emulator-only host
+# endpoint (192.168.10.254) to the donor web ports, never flush donor rules.
 diag_tick=0
 while :; do
   if [ -e /sys/class/net/br-lan ]; then
     ifconfig eth1 0.0.0.0 up 2>/dev/null || true
     brctl show br-lan 2>/dev/null | grep -qw eth1 || brctl addif br-lan eth1 2>/dev/null || true
   fi
+
+  if command -v iptables >/dev/null 2>&1; then
+    for p in 80 443; do
+      iptables -C INPUT -i br-lan -s 192.168.10.254 -p tcp --dport "$p" -j ACCEPT 2>/dev/null ||
+        iptables -I INPUT 1 -i br-lan -s 192.168.10.254 -p tcp --dport "$p" -j ACCEPT 2>/dev/null || true
+      iptables -C OUTPUT -o br-lan -d 192.168.10.254 -p tcp --sport "$p" -j ACCEPT 2>/dev/null ||
+        iptables -I OUTPUT 1 -o br-lan -d 192.168.10.254 -p tcp --sport "$p" -j ACCEPT 2>/dev/null || true
+    done
+  fi
+
   if [ "$diag_tick" -eq 0 ]; then
     dump_diag
   fi
