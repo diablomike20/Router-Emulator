@@ -40,6 +40,16 @@ jobs:
           echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
           cp "$FLASH" /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin
 
+      - name: Inspect donor board detection
+        run: |
+          set -euo pipefail
+          FLASH=/tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin
+          mkdir -p /tmp/lt500d-inspect
+          dd if="$FLASH" of=/tmp/lt500d-inspect/root.squashfs bs=1 skip=$((0x2a7d4d)) status=none
+          unsquashfs -cat /tmp/lt500d-inspect/root.squashfs lib/ramips.sh 2>/dev/null | sed -n '1,220p'
+          echo '=== factory hook ==='
+          unsquashfs -cat /tmp/lt500d-inspect/root.squashfs lib/preinit/82_factory_mac 2>/dev/null | sed -n '1,180p'
+
       - name: Build emulator image from verified donor
         id: build
         run: |
