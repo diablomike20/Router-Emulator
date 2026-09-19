@@ -36,28 +36,31 @@ BLOCKS=$((SIZE*1024))
 # the ext2 image; debugfs edits the image file and does not require host mknod.
 ensure_dir() {
   local rel="${1#/}" out
-  out="$("$DEBUGFS" -R "stat $rel" "$FS" 2>&1 || true)"
+  out="$("$DEBUGFS" -R "stat /$rel" "$FS" 2>&1 || true)"
   if ! printf '%s\n' "$out" | grep -q "Inode:"; then
-    out="$("$DEBUGFS" -w -R "mkdir $rel" "$FS" 2>&1)" || {
-      echo "debugfs mkdir failed for /$rel"
-      printf '%s\n' "$out"
-      exit 1
-    }
+    out="$("$DEBUGFS" -w -R "mkdir /$rel" "$FS" 2>&1 || true)"
+    printf '%s\n' "$out" >&2
+    out="$("$DEBUGFS" -R "stat /$rel" "$FS" 2>&1 || true)"
+    printf '%s\n' "$out" | grep -q "Inode:" || { echo "Failed to create directory /$rel"; exit 1; }
   fi
 }
 
 ensure_node() {
-  local path="$1" type="$2" major="$3" minor="$4" rel out
+  local path="$1" type="$2" major="$3" minor="$4" rel parent base out cmd
   rel="${path#/}"
-  out="$("$DEBUGFS" -R "stat $rel" "$FS" 2>&1 || true)"
+  parent="${rel%/*}"
+  base="${rel##*/}"
+  out="$("$DEBUGFS" -R "stat /$rel" "$FS" 2>&1 || true)"
   if ! printf '%s\n' "$out" | grep -q "Inode:"; then
-    out="$("$DEBUGFS" -w -R "mknod $rel $type $major $minor" "$FS" 2>&1)" || {
-      echo "debugfs mknod failed for $path"
-      printf '%s\n' "$out"
-      exit 1
-    }
+    cmd="$TMP/debugfs-mknod.cmd"
+    {
+      printf 'cd /%s\n' "$parent"
+      printf 'mknod %s %s %s %s\n' "$base" "$type" "$major" "$minor"
+    } > "$cmd"
+    out="$("$DEBUGFS" -w -f "$cmd" "$FS" 2>&1 || true)"
+    printf '%s\n' "$out" >&2
   fi
-  out="$("$DEBUGFS" -R "stat $rel" "$FS" 2>&1 || true)"
+  out="$("$DEBUGFS" -R "stat /$rel" "$FS" 2>&1 || true)"
   if ! printf '%s\n' "$out" | grep -q "Inode:"; then
     echo "Failed to create $path"
     printf '%s\n' "$out"
