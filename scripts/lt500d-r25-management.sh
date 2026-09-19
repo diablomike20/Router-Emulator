@@ -30,7 +30,13 @@ dump_diag() {
     if command -v iptables >/dev/null 2>&1; then
       echo "[LT500D-EMU] INPUT"
       iptables -nvL INPUT --line-numbers 2>&1 || true
+      echo "[LT500D-EMU] OUTPUT"
+      iptables -nvL OUTPUT --line-numbers 2>&1 || true
     fi
+    echo "[LT500D-EMU] rp_filter"
+    for f in /proc/sys/net/ipv4/conf/all/rp_filter /proc/sys/net/ipv4/conf/eth1/rp_filter; do
+      [ -r "$f" ] && echo "$f=$(cat "$f")"
+    done
     echo "[LT500D-EMU] network diagnostic end"
   } > /dev/console 2>&1 || true
 }
@@ -43,6 +49,8 @@ while :; do
     for p in 80 443; do
       iptables -C INPUT -i eth1 -p tcp --dport "$p" -j ACCEPT 2>/dev/null ||
         iptables -I INPUT 1 -i eth1 -p tcp --dport "$p" -j ACCEPT 2>/dev/null || true
+      iptables -C OUTPUT -o eth1 -p tcp --sport "$p" -j ACCEPT 2>/dev/null ||
+        iptables -I OUTPUT 1 -o eth1 -p tcp --sport "$p" -j ACCEPT 2>/dev/null || true
     done
   fi
   if [ "$diag_tick" -eq 0 ]; then
