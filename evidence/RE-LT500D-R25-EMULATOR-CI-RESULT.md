@@ -1,10 +1,10 @@
 # RE-LT500D R25 emulator CI result
 
-Commit: f94bb5398edb6c2bd26f45d0ed5c0e3ade038cb6
+Commit: 5a17544f00acd050a09987afa806ffeea7fd9d32
 Firmware download/verify: success
 Image build: failure
 QEMU/HTTP gate: skipped
-Run: https://github.com/diablomike20/Router-Emulator/actions/runs/35427840802
+Run: https://github.com/diablomike20/Router-Emulator/actions/runs/35428388105
 
 
 ## Serial tail
