@@ -77,7 +77,14 @@ jobs:
             sed -n '1,180p' "$R/www/index.html" 2>&1 || true
             echo
             echo '== LuCI runtime files =='
-            ls -l "$R/usr/lib/lua/luci/dispatcher.lua" "$R/usr/lib/lua/luci/sgi/cgi.lua" "$R/usr/lib/lua/luci/cacheloader.lua" 2>&1 || true
+            ls -l "$R/usr/lib/lua/luci/dispatcher.lua" "$R/usr/lib/lua/luci/sgi/cgi.lua" "$R/usr/lib/lua/luci/sgi/uhttpd.lua" "$R/usr/lib/lua/luci/cacheloader.lua" 2>&1 || true
+            echo
+            echo '== uhttpd Lua module =='
+            ls -l "$R/usr/lib/uhttpd_lua.so" 2>&1 || true
+            file "$R/usr/lib/uhttpd_lua.so" 2>&1 || true
+            echo
+            echo '== LuCI uhttpd handler =='
+            sed -n '1,220p' "$R/usr/lib/lua/luci/sgi/uhttpd.lua" 2>&1 || true
             echo
             echo '== Lua / uhttpd binaries =='
             file "$R/usr/bin/lua" "$R/usr/sbin/uhttpd" 2>&1 || true
