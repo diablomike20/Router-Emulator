@@ -17,6 +17,7 @@ EXTRA_ARGS="$*"
 exec qemu-system-mipsel \
   -M malta \
   -m 256 \
+  -cpu 24Kc \
   -kernel "$KERNEL" \
   -drive if=ide,format=raw,file="$IMAGE" \
   -append "firmadyne.syscall=1 root=/dev/sda1 console=ttyS0 rw debug ignore_loglevel print-fatal-signals=1 FIRMAE_NET=true FIRMAE_NVRAM=true FIRMAE_KERNEL=true FIRMAE_ETC=true user_debug=31 LT500D_EMU=R25 $EXTRA_ARGS" \
