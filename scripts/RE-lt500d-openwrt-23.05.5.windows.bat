@@ -18,7 +18,9 @@ echo 2. Check prerequisites
 echo 3. Build emulator image
 echo 4. Start emulator
 echo 5. Smoke test
-echo 6. Open HTTP page
+echo 6. Build + Start + Verify + Open UI
+echo 7. Open HTTP page
+echo 8. Open HTTPS page
 echo 7. Open HTTPS page
 echo 0. Exit
 set /p C=Choose:
