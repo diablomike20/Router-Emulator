@@ -39,13 +39,31 @@ iptables and sets INPUT ACCEPT. Do **not** use that generic firewall bypass as
 LT500D fidelity evidence. The LT500D profile deliberately limits the exception
 to emulator-only eth1 TCP 80/443.
 
-## macOS role
+## macOS build path
 
-macOS can run the final QEMU command, but the stock FirmAE image-building
-pipeline is Linux-specific (loop devices, fdisk/mkfs/mount/chroot and related
-tooling). Build/prep `image.raw` with FirmAE in a Linux environment, then the
-resulting kernel + image can be launched on Intel macOS with
-`scripts/run.lt500d-r25.mipsel.sh`.
+The branch now has a native, mountless macOS image builder. It uses Homebrew
+e2fsprogs `mke2fs -d` to populate ext2 directly from the donor tree and
+`debugfs` to create the minimal Linux device nodes that an unprivileged macOS
+SquashFS extraction cannot reliably materialize. No loop device, Linux mount,
+fakeroot, or genext2fs is required by this path.
+
+The one-shot entry point is:
+
+```sh
+./scripts/make.lt500d-r25-emulator.macos.sh /path/to/LT500V2-R25-2.4.16-20250804-150319-flash.bin scratch/lt500d-r25
+```
+
+It refuses a donor whose size or SHA-256 differs from the verified R25 image,
+extracts SquashFS at the verified offset, downloads only the FirmAE runtime
+artifacts required by this profile, applies the LT500D compatibility layer,
+and builds the MBR/ext2 image.
+
+Then start QEMU and run the host gate:
+
+```sh
+./scripts/start.lt500d-r25.sh scratch/lt500d-r25/image.raw
+./scripts/smoke.lt500d-r25-http.sh
+```
 
 ## First v1 gate
 
