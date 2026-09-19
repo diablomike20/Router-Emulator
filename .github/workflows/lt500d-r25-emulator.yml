@@ -59,10 +59,14 @@ jobs:
           QEMU_PID=$!
           echo "$QEMU_PID" > /tmp/lt500d-r25-qemu.pid
 
-          ok=0
+          transport_ok=0
+          asset_url=http://127.0.0.1:8080/luci-static/bootstrap/js/sysauth.js
           for i in $(seq 1 60); do
-            if curl -sS --connect-timeout 0.5 --max-time 1 -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/; then
-              ok=1
+            if curl -sS --connect-timeout 0.5 --max-time 1 -D /tmp/lt500d-r25-static.bin.headers -o /tmp/lt500d-r25-static.bin "$asset_url" && [ -s /tmp/lt500d-r25-static.bin ]; then
+              transport_ok=1
+              echo "LT500D_STATIC_HTTP_GATE=PASS"
+              head -n 1 /tmp/lt500d-r25-static.bin.headers || true
+              wc -c /tmp/lt500d-r25-static.bin
               break
             fi
             if ! kill -0 "$QEMU_PID" 2>/dev/null; then
@@ -72,8 +76,12 @@ jobs:
             sleep 1
           done
 
-          if [ "$ok" -ne 1 ]; then
-            LT500D_CONNECT_TIMEOUT=0.5 LT500D_MAX_TIME=1 bash scripts/smoke.lt500d-r25-http.sh /tmp/lt500d-r25-http-body.bin && ok=1 || true
+          ok=0
+          if [ "$transport_ok" -eq 1 ]; then
+            echo "Probing donor root/LuCI"
+            if curl -sS --connect-timeout 1 --max-time 10 -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/; then
+              ok=1
+            fi
           fi
 
           echo "=== serial tail ==="
@@ -81,7 +89,12 @@ jobs:
           echo "=== process ==="
           ps -fp "$QEMU_PID" || true
 
+          if [ "$transport_ok" -ne 1 ]; then
+            echo "FAIL: hostfwd/static donor HTTP transport unavailable"
+            exit 1
+          fi
           if [ "$ok" -ne 1 ]; then
+            echo "FAIL: static donor HTTP works, but donor root/LuCI did not answer"
             exit 1
           fi
 
@@ -156,3 +169,5 @@ jobs:
             scratch/lt500d-r25/qemu.serial.log
             /tmp/lt500d-r25-http-body.bin
             /tmp/lt500d-r25-http-body.bin.headers
+            /tmp/lt500d-r25-static.bin
+            /tmp/lt500d-r25-static.bin.headers
