@@ -1,0 +1,93 @@
+name: LT500D R25 emulator gate
+
+on:
+  push:
+    branches:
+      - lt500d-r25-emulator-v1
+    paths:
+      - "scripts/**"
+      - "profiles/lt500d-r25/**"
+      - ".github/workflows/lt500d-r25-emulator.yml"
+  workflow_dispatch:
+
+jobs:
+  emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 libdigest-sha-perl
+
+      - name: Download official Cudy R25 2.4.16 firmware
+        run: |
+          set -euo pipefail
+          URL='https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip?v=5016960833307663900'
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/lt500d-r25.zip "$URL"
+          unzip -l /tmp/lt500d-r25.zip
+          mkdir -p /tmp/lt500d-r25-fw
+          unzip -j /tmp/lt500d-r25.zip -d /tmp/lt500d-r25-fw
+          FLASH="$(find /tmp/lt500d-r25-fw -type f -name '*flash.bin' | head -1)"
+          test -n "$FLASH"
+          test "$(stat -c %s "$FLASH")" = "12124315"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
+          cp "$FLASH" /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin
+
+      - name: Build emulator image from verified donor
+        run: |
+          set -euo pipefail
+          bash scripts/make.lt500d-r25-emulator.macos.sh             /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin             scratch/lt500d-r25
+
+      - name: Boot QEMU and wait for Cudy HTTP
+        id: gate
+        run: |
+          set -euo pipefail
+          rm -f scratch/lt500d-r25/qemu.serial.log /tmp/lt500d-r25-http-body.bin*
+          bash scripts/start.lt500d-r25.sh scratch/lt500d-r25/image.raw &
+          QEMU_PID=$!
+          echo "$QEMU_PID" > /tmp/lt500d-r25-qemu.pid
+
+          ok=0
+          for i in $(seq 1 90); do
+            if bash scripts/smoke.lt500d-r25-http.sh /tmp/lt500d-r25-http-body.bin; then
+              ok=1
+              break
+            fi
+            if ! kill -0 "$QEMU_PID" 2>/dev/null; then
+              echo "QEMU exited before HTTP gate"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "=== serial tail ==="
+          tail -n 250 scratch/lt500d-r25/qemu.serial.log || true
+          echo "=== process ==="
+          ps -fp "$QEMU_PID" || true
+
+          if [ "$ok" -ne 1 ]; then
+            exit 1
+          fi
+
+          echo "LT500D_HTTP_GATE=PASS"
+
+      - name: Stop QEMU
+        if: always()
+        run: |
+          if [ -f /tmp/lt500d-r25-qemu.pid ]; then
+            kill "$(cat /tmp/lt500d-r25-qemu.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RE-LT500D-R25-EMULATOR-EVIDENCE
+          if-no-files-found: ignore
+          path: |
+            scratch/lt500d-r25/qemu.serial.log
+            /tmp/lt500d-r25-http-body.bin
+            /tmp/lt500d-r25-http-body.bin.headers
