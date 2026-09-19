@@ -1,0 +1,778 @@
+RE LT500D R25 DONOR LAN TRACE
+================================
+
+== direct literal files: 192.168.10.1 ==
+/tmp/lantrace/root/etc/uci-defaults/01_network
+
+== direct textual hits: 192.168.10.1 ==
+/tmp/lantrace/root/etc/uci-defaults/01_network:11:		uci set network.lan.def_ipaddr="192.168.10.1"
+/tmp/lantrace/root/etc/uci-defaults/01_network:12:		uci set network.lan.ipaddr='192.168.10.1'
+/tmp/lantrace/root/etc/uci-defaults/01_network:17:		uci set network.lan.def_ipaddr="192.168.10.1"
+/tmp/lantrace/root/etc/uci-defaults/01_network:18:		uci set network.lan.ipaddr='192.168.10.1'
+
+== direct DHCP-range hits ==
+
+== network/bootstrap references ==
+/tmp/lantrace/root/etc/ipsec.include:11:echo 1 > /proc/sys/net/ipv4/conf/br-lan/proxy_arp
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:4:	lan_ip=$(ifconfig br-lan | grep inet | awk '{print $2}' | awk -F: '{print $2}')
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:5:	lan_ip=${lan_ip:-$(uci get network.lan.ipaddr)}
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:6:	lan_netmask=$(uci get network.lan.netmask)
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:7:	lan_def_ip=$(uci get network.lan.def_ipaddr)
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:28:			uci set network.lan.ipaddr="$lan_new_ip"
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:29:			uci set network.lan.netmask="255.255.255.0"
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:30:			uci set network.guest.ipaddr="$guest_new_ip"
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:35:			ifconfig  br-lan $lan_new_ip netmask 255.255.255.0
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:38:		if [ "$(uci -q get network.guest)" = "interface" -a x"$(uci -q get network.guest.disabled)" != x"1" ]; then
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:39:			guest_ip=$(uci get network.guest.ipaddr)
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:40:			guest_netmask=$(uci get network.guest.netmask)
+/tmp/lantrace/root/etc/udhcpc.d/00-ip-chk.sh:59:				uci set network.guest.ipaddr="$guest_new_ip"
+/tmp/lantrace/root/etc/board.d/02_network:32:		ucidef_set_interfaces_lan_wan "eth0.1" "eth1.2"
+/tmp/lantrace/root/etc/config/dhcp:19:	#list interface		br-lan
+/tmp/lantrace/root/etc/hotplug.d/iface/30-apmode:5:[ "$INTERFACE" = wan -a x"$(uci -q get network.wan.type)" == x"bridge" ] && {
+/tmp/lantrace/root/etc/hotplug.d/iface/00-netstate:2:	uci_toggle_state network "$INTERFACE" up 1
+/tmp/lantrace/root/etc/hotplug.d/iface/00-netstate:4:		uci_toggle_state network "$INTERFACE" device "$(uci -q get network.$INTERFACE.ifname)"
+/tmp/lantrace/root/etc/hotplug.d/iface/00-netstate:5:		uci_toggle_state network "$INTERFACE" ifname "$DEVICE"
+/tmp/lantrace/root/etc/hotplug.d/iface/60-ipv6:5:ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/etc/hotplug.d/iface/60-ipv6:6:ip6type=$(uci -q get network.lan.ip6type)
+/tmp/lantrace/root/etc/hotplug.d/iface/60-ipv6:10:	[ "$DEVICE" = br-lan ] || {
+/tmp/lantrace/root/etc/hotplug.d/iface/60-ipv6:14:			ifconfig br-lan promisc
+/tmp/lantrace/root/etc/hotplug.d/iface/60-ipv6:22:		ifconfig br-lan -promisc
+/tmp/lantrace/root/etc/hotplug.d/iface/25-dns-route:11:			subnet=$(uci get network.lan.netmask)
+/tmp/lantrace/root/etc/hotplug.d/iface/25-dns-route:15:			elif [ "$(uci -q get network.guest)" = "interface" -a x"$(uci -q get network.guest.disabled)" != x"1" ]; then
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:29:	local lan_ifname=$(uci -q get network.lan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:30:	local wan_ifname=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:85:	local lan_ifname=$(uci -q get network.lan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:86:	local wan_ifname=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:110:	local lan_ifname=$(uci -q get network.lan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:111:	local wan_ifname=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:125:	local dev_switch=$(uci -q get network.@switch_vlan[0].device)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:126:	local lan_vlan=$(uci -q get network.@switch_vlan[0].vlan)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:127:	local wan_vlan=$(uci -q get network.@switch_vlan[1].vlan)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:128:	local lan_ifname=$(uci -q get network.lan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:129:	local wan_ifname=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:143:		if [ x"bridge" = x"$(uci -q get network.wan.type)" ]; then
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:172:	local lan_ports=$(uci get network.@switch_vlan[0].ports)
+/tmp/lantrace/root/etc/hotplug.d/wandetect/08-wan-detect:173:	local wan_ports=$(uci get network.@switch_vlan[1].ports)
+/tmp/lantrace/root/etc/hotplug.d/gmac/10-odhcp6c:4:[ "1" = "$(uci -q get network.lan.ipv6)" ] || exit 0
+/tmp/lantrace/root/etc/hotplug.d/gmac/10-odhcp6c:6:dev_switch=$(uci -q get network.@switch_vlan[0].device)
+/tmp/lantrace/root/etc/hotplug.d/gmac/10-odhcp6c:7:wan_vlan=$(uci -q get network.@switch_vlan[1].vlan)
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:9:	local detect=$(uci -q get network.wan.detect)
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:10:	local wantype=$(uci -q get network.wan.type)
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:17:			[ x"$(uci -q get network.wan2)" == x"interface" ] && ifup wan2
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:28:			dev_switch=$(uci -q get network.@switch_vlan[0].device)
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:58:		[ x"$(uci -q get network.wan2)" == x"interface" ] && ifup wan2
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:60:		dev_switch=$(uci -q get network.@switch_vlan[0].device)
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:63:			if [ "router" = "$(uci -q get system.board.type)" -a x"$(uci -q get network.iptv.disabled)" == x"0" ]; then
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:69:					wan_vlan=$(uci -q get network.@switch_vlan[1].vlan)
+/tmp/lantrace/root/etc/hotplug.d/gmac/08-wan-detect:84:			[ x"$(uci -q get network.wan2)" == x"interface" ] && ifup wan2
+/tmp/lantrace/root/etc/uci-defaults/90_guest:9:	uci -q get network.guest || {
+/tmp/lantrace/root/etc/uci-defaults/90_guest:10:		uci set network.guest=interface
+/tmp/lantrace/root/etc/uci-defaults/90_guest:11:		uci set network.guest.proto='static'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:12:		uci set network.guest.netmask='255.255.255.0'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:13:		uci set network.guest.ifname='br-lan.8'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:14:		uci set network.guest.disabled='1'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:28:		uci set firewall.@zone[-1].network='guest'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:64:[ x"$(uci -q get wireless.wlan02.network)" == x"guest" ] && {
+/tmp/lantrace/root/etc/uci-defaults/90_guest:65:	[ x"$(uci -q get wireless.wlan12.network)" == x"guest" ] && {
+/tmp/lantrace/root/etc/uci-defaults/90_guest:66:		uci set wireless.wlan12.network='lan'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:69:	uci set wireless.wlan02.network='lan'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:72:	uci delete network.guest.type
+/tmp/lantrace/root/etc/uci-defaults/90_guest:73:	uci set network.guest.ifname='br-lan.8'
+/tmp/lantrace/root/etc/uci-defaults/90_guest:74:	uci commit network
+/tmp/lantrace/root/etc/uci-defaults/90_guest:81:uci commit network
+/tmp/lantrace/root/etc/uci-defaults/99_oem:13:mv /usr/lib/lua/luci/iptv.lua /usr/lib/lua/luci/model/cbi/network/iptv.lua
+/tmp/lantrace/root/etc/uci-defaults/99_oem:26:ifname=$(uci -q get network.4g.ifname)
+/tmp/lantrace/root/etc/uci-defaults/99_oem:28:	uci set network.4g.ifname="usb0"
+/tmp/lantrace/root/etc/uci-defaults/99_oem:29:	uci commit network
+/tmp/lantrace/root/etc/uci-defaults/99_oem:68:rxkb=$(uci -q get network.4g.rxkb)
+/tmp/lantrace/root/etc/uci-defaults/99_oem:70:	txkb=$(uci -q get network.4g.txkb)
+/tmp/lantrace/root/etc/uci-defaults/99_oem:72:	rxkb=$(uci -q get network.4g.curr_month_rxkb)
+/tmp/lantrace/root/etc/uci-defaults/99_oem:73:	txkb=$(uci -q get network.4g.curr_month_txkb)
+/tmp/lantrace/root/etc/uci-defaults/99_oem:86:ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/etc/uci-defaults/99_oem:88:	uci set network.wan6.disabled='1'
+/tmp/lantrace/root/etc/uci-defaults/99_oem:89:	uci commit network
+/tmp/lantrace/root/etc/uci-defaults/99_oem:92:mode=$(uci -q get network.wan.mode)
+/tmp/lantrace/root/etc/uci-defaults/99_oem:95:		set network.lan.ifname='eth0.1'
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:8:	if [ x"$(uci -q get network.wan.type)" != x"bridge" ]; then
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:21:	lan_if=$(uci -q get network.lan.def_ifname)
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:22:	wan_if=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:27:				set network.lan.ifname="$lan_if"
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:33:				set network.lan.ifname="$lan_if $wan_if"
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:41:[ -n "$(uci -q get network.wan2)" ] || {
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:42:	wan_if=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:53:uci del_list firewall.@zone[1].network='wan2'
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan:54:uci add_list firewall.@zone[1].network='wan2'
+/tmp/lantrace/root/etc/uci-defaults/01_network:10:	uci -q get network.lan.def_ipaddr || {
+/tmp/lantrace/root/etc/uci-defaults/01_network:11:		uci set network.lan.def_ipaddr="192.168.10.1"
+/tmp/lantrace/root/etc/uci-defaults/01_network:12:		uci set network.lan.ipaddr='192.168.10.1'
+/tmp/lantrace/root/etc/uci-defaults/01_network:16:	uci -q get network.lan.def_ipaddr || {
+/tmp/lantrace/root/etc/uci-defaults/01_network:17:		uci set network.lan.def_ipaddr="192.168.10.1"
+/tmp/lantrace/root/etc/uci-defaults/01_network:18:		uci set network.lan.ipaddr='192.168.10.1'
+/tmp/lantrace/root/etc/uci-defaults/01_network:20:	uci -q get network.wisp || {
+/tmp/lantrace/root/etc/uci-defaults/01_network:21:		uci set network.wisp=interface
+/tmp/lantrace/root/etc/uci-defaults/01_network:22:		uci set network.wisp.disabled='1'
+/tmp/lantrace/root/etc/uci-defaults/01_network:23:		uci set network.wisp.auto='0'
+/tmp/lantrace/root/etc/uci-defaults/01_network:24:		uci set network.wisp.proto='dhcp'
+/tmp/lantrace/root/etc/uci-defaults/01_network:25:		uci set network.wisp.metric='80'
+/tmp/lantrace/root/etc/uci-defaults/01_network:26:		uci set network.wan.metric='60'
+/tmp/lantrace/root/etc/uci-defaults/01_network:27:		uci del_list firewall.@zone[1].network='wisp'
+/tmp/lantrace/root/etc/uci-defaults/01_network:28:		uci add_list firewall.@zone[1].network='wisp'
+/tmp/lantrace/root/etc/uci-defaults/01_network:36:uci commit network
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:4:ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:6:	ip6type=$(uci -q get network.lan.ip6type)
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:8:		uci set network.lan.ip6type='dhcp'
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:9:		uci commit network
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:12:		uci set network.wan6.iface_464xlat='0'
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:13:		uci commit network
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:17:def_ifname=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:19:	uci set network.wan6.ifname="$def_ifname"
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:20:	uci commit network
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6:23:[ x"$(uci -q get network.lan.ip6type)" == x"relay" ] && {
+/tmp/lantrace/root/etc/uci-defaults/30_4g_pingcheck:4:uci -q get network.4g && {
+/tmp/lantrace/root/etc/uci-defaults/30_4g_pingcheck:38:ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/etc/uci-defaults/30_4g_pingcheck:40:	ip6type=$(uci -q get network.lan.ip6type)
+/tmp/lantrace/root/etc/uci-defaults/30_4g_pingcheck:42:		uci set network.4g6.iface_464xlat='0'
+/tmp/lantrace/root/etc/uci-defaults/30_4g_pingcheck:43:		uci commit network
+/tmp/lantrace/root/etc/uci-defaults/30_wlan:66:[ x"$(uci -q get wireless.wlan01.network)" == x"lan" ] && uci set wireless.wlan01.network='wan'
+/tmp/lantrace/root/etc/uci-defaults/30_wlan:67:[ x"$(uci -q get wireless.wlan11.network)" == x"lan" ] && uci set wireless.wlan11.network='wan'
+/tmp/lantrace/root/etc/uci-defaults/30_wlan:70:	uci set wireless.wlan02.network='wan'
+/tmp/lantrace/root/etc/uci-defaults/30_wlan:71:	uci set wireless.wlan12.network='wan'
+/tmp/lantrace/root/etc/uci-defaults/12_network-generate-ula:3:[ "$(uci -q get network.globals.ula_prefix)" != "auto" ] && exit 0
+/tmp/lantrace/root/etc/uci-defaults/40_luci-vpn:17:uci -q get network.vpn || {
+/tmp/lantrace/root/etc/init.d/vlan:39:		[ x"$(uci_get network.guest.disabled)" == x"1" ] && return
+/tmp/lantrace/root/etc/init.d/vlan:86:		local lan_ifnames=$(uci_get network.lan.ifname)
+/tmp/lantrace/root/etc/init.d/vlan:104:			wan_ifnames=$(uci_get network.wan.ifname)
+/tmp/lantrace/root/etc/init.d/vlan:117:	ifnames=$(uci_get network.wan.ifname)
+/tmp/lantrace/root/etc/init.d/network:60:	uci_validate_section network "atm-bridge" "${1}" \
+/tmp/lantrace/root/etc/init.d/network:71:	uci_validate_section network route "${1}" \
+/tmp/lantrace/root/etc/init.d/network:83:	uci_validate_section network route6 "${1}" \
+/tmp/lantrace/root/etc/init.d/network:94:	uci_validate_section network rule "${1}" \
+/tmp/lantrace/root/etc/init.d/network:109:	uci_validate_section network rule6 "${1}" \
+/tmp/lantrace/root/etc/init.d/network:124:	uci_validate_section network switch "${1}" \
+/tmp/lantrace/root/etc/init.d/network:133:	uci_validate_section network switch_vlan "${1}" \
+/tmp/lantrace/root/etc/init.d/ipsec:346:	local serverip=$(uci -q get network.l2tp.server)
+/tmp/lantrace/root/etc/init.d/ipsec:347:	local secret=$(uci -q get network.l2tp.secret)
+/tmp/lantrace/root/etc/init.d/ipsec:348:	[ x"$(uci -q get network.l2tp.disabled)" == x"1" ] && return 1
+/tmp/lantrace/root/etc/init.d/igmpproxy:55:		local proto2="$(uci -q get network.wan2.proto)"
+/tmp/lantrace/root/etc/init.d/igmpproxy:153:	local device=$(uci_get network.wan.def_ifname)
+/tmp/lantrace/root/etc/init.d/cwmp:130:    local public_client_ip=$(uci_get_state network lan inetip) 
+/tmp/lantrace/root/etc/init.d/openvpn:242:		local ipaddr=$(uci -q get network.lan.ipaddr)
+/tmp/lantrace/root/etc/init.d/openvpn:243:		local netmask=$(uci -q get network.lan.netmask)
+/tmp/lantrace/root/etc/init.d/openvpn:245:		uci add_list openvpn.server.push="route $network $netmask"
+/tmp/lantrace/root/etc/init.d/timewol:17:		echo "$min $hour * * $week [ -f /tmp/.timeclock ] && /usr/bin/etherwake -D -i br-lan $macaddr" >> /etc/crontabs/root
+/tmp/lantrace/root/etc/init.d/system:40:	[ "router" = "$(uci -q get system.board.type)" -o x"static" = x"$(uci -q get network.wan.proto)" ] || {
+/tmp/lantrace/root/etc/init.d/system:41:		echo br-lan > /proc/net/mcore/br
+/tmp/lantrace/root/etc/init.d/hyfibrd:25:				hyctl attach br-lan
+/tmp/lantrace/root/etc/init.d/hyfibrd:26:				ubus call hyfibr init '{"iface":"br-lan", "mode":"relovr", "fwmode":"APS"}'
+/tmp/lantrace/root/etc/init.d/dnsmasq:748:		local ulaprefix="$(uci_get network @globals[0] ula_prefix)"
+/tmp/lantrace/root/etc/init.d/umdns:11:	local network="$(uci -q get umdns.@umdns[-1].network)"
+/tmp/lantrace/root/etc/init.d/umdns:40:	local network="$(uci -q get umdns.@umdns[-1].network)"
+/tmp/lantrace/root/etc/init.d/arpbind:44:	[ -z "$ifname" ] && ifname="br-lan"
+/tmp/lantrace/root/etc/init.d/arpbind:56:	if_clean_arp "br-lan"
+/tmp/lantrace/root/etc/wireless/iface/10-iface.sh:11:network=$(uci -q get wireless.$iface.network)
+/tmp/lantrace/root/etc/wireless/iface/10-iface.sh:114:	uci set network.wisp.ifname="$ifname"
+/tmp/lantrace/root/etc/wireless/iface/10-iface.sh:115:	uci commit network
+/tmp/lantrace/root/etc/wireless/iface/10-iface.sh:121:	[ x"$ifname" == x"$(uci -q get network.${network}.ifname)" ] && {
+/tmp/lantrace/root/etc/wireless/iface/10-iface.sh:122:		if [ x"$(uci -q get network.wisp.disabled)" == x"1" ]; then
+/tmp/lantrace/root/etc/wireless/mt7663e/mt7663e.5G.dat:103:EAPifname=br-lan
+/tmp/lantrace/root/etc/wireless/mt7663e/mt7663e.5G.dat:249:PreAuthifname=br-lan
+/tmp/lantrace/root/etc/openvpn.user:19:	[ x"$(uci -q get network.vpn.ifname)" == x"$ifname" ] || {
+/tmp/lantrace/root/etc/openvpn.user:20:		uci set network.vpn.ifname="$ifname"
+/tmp/lantrace/root/etc/openvpn.user:21:		uci commit network
+/tmp/lantrace/root/etc/pingcheck/offline.d/30-apmode:46:		ifnames=$(uci -q get network.lan.ifname)
+/tmp/lantrace/root/etc/pingcheck/offline.d/30-apmode:52:		ifnames=$(uci -q get network.wan.ifname)
+/tmp/lantrace/root/etc/pingcheck/offline.d/80-checkip:6:	uci_revert_state network "lan" inetip
+/tmp/lantrace/root/etc/pingcheck/offline.d/80-checkip:7:	uci_revert_state network "$INTERFACE" inetip
+/tmp/lantrace/root/etc/pingcheck/online.d/30-apmode:44:		ifnames=$(uci -q get network.lan.ifname)
+/tmp/lantrace/root/etc/pingcheck/online.d/30-apmode:50:		ifnames=$(uci -q get network.wan.ifname)
+/tmp/lantrace/root/etc/pingcheck/online.d/80-checkip:6:	uci_revert_state network "lan" inetip
+/tmp/lantrace/root/etc/pingcheck/online.d/80-checkip:7:	uci_revert_state network "$INTERFACE" inetip
+/tmp/lantrace/root/lib/netifd/dhcp.script:44:	nodns=$(uci -q get network.$INTERFACE.nodns)
+/tmp/lantrace/root/lib/netifd/proto/wwan.sh:91:	uci_set_state network $interface driver "$driver"
+/tmp/lantrace/root/lib/netifd/proto/wwan.sh:92:	uci_set_state network $interface ctl_device "$ctl_device"
+/tmp/lantrace/root/lib/netifd/proto/wwan.sh:93:	uci_set_state network $interface dat_device "$dat_device"
+/tmp/lantrace/root/lib/netifd/proto/wwan.sh:106:	local driver=$(uci_get_state network $interface driver)
+/tmp/lantrace/root/lib/netifd/proto/wwan.sh:107:	ctl_device=$(uci_get_state network $interface ctl_device)
+/tmp/lantrace/root/lib/netifd/proto/wwan.sh:108:	dat_device=$(uci_get_state network $interface dat_device)
+/tmp/lantrace/root/lib/netifd/dhcpv6.script:169:	[ "$(uci get network.lan.ip6type)" == "464xlat" ] && IFACE_464XLAT=1
+/tmp/lantrace/root/lib/netifd/dhcpv6.script:170:	[ "$(uci get network.lan.ip6type)" == "dslite" ] && IFACE_DSLITE=1
+/tmp/lantrace/root/lib/netifd/dhcpv6.script:171:	[ "$(uci get network.lan.ip6type)" == "map-e" ] && IFACE_MAP=1
+/tmp/lantrace/root/usr/lib/4g/upgrade.sh:7:DEVICE=$(uci -q get network.${IFACE}.cdevice)
+/tmp/lantrace/root/usr/lib/4g/upgrade.sh:8:VENDOR=$(uci -q get network.${IFACE}.vendor)
+/tmp/lantrace/root/usr/lib/4g/reset.sh:4:DEVICE=$(uci -q get network.${IFACE}.cdevice)
+/tmp/lantrace/root/usr/lib/4g/reset.sh:5:VENDOR=$(uci -q get network.${IFACE}.vendor)
+/tmp/lantrace/root/usr/lib/4g/search.sh:4:DEVICE=$(uci -q get network.${IFACE}.cdevice)
+/tmp/lantrace/root/usr/lib/4g/search.sh:5:VENDOR=$(uci -q get network.${IFACE}.vendor)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:5:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:6:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:7:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:8:	local search=$(uci -q get network.${IFACE}.search)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:9:	local pdptype=$(uci -q get network.${IFACE}.pdptype | tr '[a-z]' '[A-Z]')
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:10:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:11:	local ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:93:		local oper=$(uci -q get network.${IFACE}.oper)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:184:	local antenna=$(uci -q get network.${IFACE}.antenna)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:185:	local roaming=$(uci -q get network.${IFACE}.roaming)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:186:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:187:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:188:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:189:	local ltebands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:190:	local selband=$(uci -q get network.${IFACE}.selband)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:211:		ltebands=$(uci -q get network.${IFACE}.ltebands)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:251:	local imei=$(uci -q get network.${IFACE}.imei)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:252:	local magic=$(uci -q get network.${IFACE}.magic)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:253:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:289:	[ x"$(uci -q get network.${IFACE}.usbtype)" == x"ecm" ] || {
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:313:					uci set network.${IFACE}.imei="$rimei"
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:314:					uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:336:	local simslot=$(uci -q get network.${IFACE}.simslot)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:383:	local pincode=$(uci -q get network.${IFACE}.pincode${simslot})
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:389:		uci -q delete network.${IFACE}.pincode${simslot}
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:390:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:447:	local defbands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:452:				uci set network.${IFACE}.defbands="2 4 5 7 12 13 14 25 26 29 30 41 48 66 71"
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:455:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 32 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:458:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 32 38 40 41 42 43"
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:461:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:504:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:514:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:522:	uci delete network.${IFACE}.lasticcid${simslot}
+/tmp/lantrace/root/usr/lib/4g/quectel2.sh:523:	uci commit network
+/tmp/lantrace/root/usr/lib/4g/common.sh:131:Product=$(uci -q get network.${IFACE}.product)
+/tmp/lantrace/root/usr/lib/4g/common.sh:206:	local ifname=$(uci -q get network.${IFACE}.ifname)
+/tmp/lantrace/root/usr/lib/4g/common.sh:237:	local ifname=$(uci -q get network.${IFACE}.ifname)
+/tmp/lantrace/root/usr/lib/4g/common.sh:269:	local monthly_date=$(uci -q get network.4g.monthly_date${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:270:	local start_date=$(uci -q get network.4g.start_date${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:281:		uci set network.4g.monthly_date${simslot}="$monthly_date"
+/tmp/lantrace/root/usr/lib/4g/common.sh:297:			uci set network.4g.monthly_date${simslot}=$(date +"%m")
+/tmp/lantrace/root/usr/lib/4g/common.sh:298:			uci delete network.${IFACE}.alert_done${simslot}
+/tmp/lantrace/root/usr/lib/4g/common.sh:302:	uci set network.4g.monthly_data${simslot}="$monthly_data"
+/tmp/lantrace/root/usr/lib/4g/common.sh:303:	uci set network.4g.total_data${simslot}="$total_data"
+/tmp/lantrace/root/usr/lib/4g/common.sh:305:	uci commit network
+/tmp/lantrace/root/usr/lib/4g/common.sh:310:	local phone=$(uci -q get network.${IFACE}.smsphone${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:311:	local content=$(uci -q get network.${IFACE}.alertsms${simslot})$(echo -en "\n[Cudy]")
+/tmp/lantrace/root/usr/lib/4g/common.sh:326:	local monthly=$(uci -q get network.${IFACE}.monthly${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:327:	local limit=$(uci -q get network.${IFACE}.limit${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:328:	local alert=$(uci -q get network.${IFACE}.alert${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:329:	local alert_done=$(uci -q get network.${IFACE}.alert_done${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:330:	local data_limit=$(uci -q get network.${IFACE}.data_limit${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:337:			local usage_alert=$(uci -q get network.${IFACE}.usage_alert${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:340:				uci set network.${IFACE}.alert_done${simslot}=1
+/tmp/lantrace/root/usr/lib/4g/common.sh:341:				uci commit network
+/tmp/lantrace/root/usr/lib/4g/common.sh:359:			local usage_alert=$(uci -q get network.${IFACE}.usage_alert${simslot})
+/tmp/lantrace/root/usr/lib/4g/common.sh:362:				uci set network.${IFACE}.alert_done${simslot}=1
+/tmp/lantrace/root/usr/lib/4g/common.sh:363:				uci commit network
+/tmp/lantrace/root/usr/lib/4g/detect.sh:15:	uci -q delete network.${IFACE}
+/tmp/lantrace/root/usr/lib/4g/detect.sh:16:	uci set network.${IFACE}=interface
+/tmp/lantrace/root/usr/lib/4g/detect.sh:17:	uci set network.${IFACE}.product="$PRODUCT"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:18:	uci set network.${IFACE}.auto='0'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:19:	uci set network.${IFACE}.service='lte'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:20:	uci set network.${IFACE}.metric='40'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:21:	uci set network.${IFACE}.pdptype='ip'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:22:	uci set network.${IFACE}6='interface'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:23:	uci set network.${IFACE}6.ifname="@${IFACE}"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:24:	uci set network.${IFACE}6.proto='dhcpv6'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:25:	uci set network.${IFACE}6.disabled='1'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:29:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:30:			uci set network.${IFACE}.ifname="usb0"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:31:			uci set network.${IFACE}.cdevice="/dev/ttyUSB1"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:32:			uci set network.${IFACE}.usbtype="ecm"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:33:			uci set network.${IFACE}.vendor='quectel'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:36:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:37:			uci set network.${IFACE}.ifname="usb0"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:38:			uci set network.${IFACE}.cdevice="/dev/ttyUSB1"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:39:			uci set network.${IFACE}.usbtype="ecm"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:40:			uci set network.${IFACE}.vendor='quectel'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:41:			uci set network.${IFACE}.autoapn="1"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:44:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:45:			uci set network.${IFACE}.ifname="$(ls ${basedir}/${basedir##*/}:1.4/net)"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:46:			uci set network.${IFACE}.cdevice="/dev/ttyUSB2"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:47:			uci set network.${IFACE}.vendor='quectel'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:48:			uci set network.${IFACE}.simslot='0'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:51:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:52:			uci set network.${IFACE}.ifname="$(ls ${basedir}/${basedir##*/}:1.4/net)"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:53:			uci set network.${IFACE}.cdevice="/dev/ttyUSB2"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:54:			uci set network.${IFACE}.vendor='quectel2'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:55:			uci set network.${IFACE}.simslot='0'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:58:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:59:			uci set network.${IFACE}.ifname="rmnet_mhi0.1"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:60:			uci set network.${IFACE}.service='all'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:61:			uci set network.${IFACE}.cdevice="/dev/ttyUSB2"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:62:			uci set network.${IFACE}.vendor='quectel-5g'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:63:			uci set network.${IFACE}.simslot='0'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:64:			uci set network.${IFACE}.i18name='5G'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:65:			uci set network.${IFACE}6.i18name='5G6'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:68:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:69:			uci set network.${IFACE}.ifname="pcie0"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:70:			uci set network.${IFACE}.service='all'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:71:			uci set network.${IFACE}.cdevice="/dev/stty_nr31"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:72:			uci set network.${IFACE}.vendor='quectel-5g'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:73:			uci set network.${IFACE}.simslot='0'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:74:			uci set network.${IFACE}.pcimode="0"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:75:			uci set network.${IFACE}.i18name='5G'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:76:			uci set network.${IFACE}6.i18name='5G6'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:79:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:80:			uci set network.${IFACE}.ifname="usb0"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:81:			uci set network.${IFACE}.cdevice="/dev/ttyUSB2"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:82:			uci set network.${IFACE}.vendor='simcom'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:85:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:86:			uci set network.${IFACE}.ifname="usb0"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:87:			uci set network.${IFACE}.cdevice="/dev/ttyUSB1"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:88:			uci set network.${IFACE}.usbtype="rndis"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:89:			uci set network.${IFACE}.vendor='meig'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:92:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:93:			uci set network.${IFACE}.ifname="wwan0"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:94:			uci set network.${IFACE}.cdevice="/dev/ttyUSB2"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:95:			uci set network.${IFACE}.vendor='meig'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:98:			uci set network.${IFACE}.proto='dhcp'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:99:			uci set network.${IFACE}.ifname="$(ls ${basedir}/${basedir##*/}:1.4/net)"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:100:			uci set network.${IFACE}.cdevice="/dev/ttyUSB2"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:101:			uci set network.${IFACE}.vendor='quectel'
+/tmp/lantrace/root/usr/lib/4g/detect.sh:105:	uci del_list firewall.@zone[1].network="$IFACE"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:106:	uci add_list firewall.@zone[1].network="$IFACE"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:107:	uci del_list firewall.@zone[1].network="${IFACE}6"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:108:	uci add_list firewall.@zone[1].network="${IFACE}6"
+/tmp/lantrace/root/usr/lib/4g/detect.sh:109:	uci commit network
+/tmp/lantrace/root/usr/lib/4g/detect.sh:126:		lan_up=$(cat /tmp/state/network | grep 'network.lan.up' | awk -F\' '{print $2}')
+/tmp/lantrace/root/usr/lib/4g/detect.sh:135:[ -n "$(uci -q get network.${IFACE})" ] || {
+/tmp/lantrace/root/usr/lib/4g/detect.sh:149:	[ -n "$(uci -q get network.${IFACE})" ] || {
+/tmp/lantrace/root/usr/lib/4g/detect.sh:164:		[ -n "$(uci -q get network.${IFACE})" ] || ubus call network.gcom reset &
+/tmp/lantrace/root/usr/lib/4g/detect.sh:170:DEVICE=$(uci -q get network.${IFACE}.cdevice)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:6:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:7:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:8:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:9:	local search=$(uci -q get network.${IFACE}.search)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:10:	local pdptype=$(uci -q get network.${IFACE}.pdptype | tr '[a-z]' '[A-Z]')
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:11:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:12:	local ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:134:		local oper=$(uci -q get network.${IFACE}.oper)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:247:	local antenna=$(uci -q get network.${IFACE}.antenna)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:248:	local roaming=$(uci -q get network.${IFACE}.roaming)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:249:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:250:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:251:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:252:	local gsmbands=$(uci -q get network.${IFACE}.gsmbands)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:253:	local ltebands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:254:	local selband=$(uci -q get network.${IFACE}.selband)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:285:		ltebands=$(uci -q get network.${IFACE}.ltebands)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:362:	local imei=$(uci -q get network.${IFACE}.imei)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:363:	local magic=$(uci -q get network.${IFACE}.magic)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:364:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:365:	local natcfg=$(uci -q get network.${IFACE}.natcfg)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:401:			local ifname=$(uci -q get network.${IFACE}.ifname)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:403:				uci set network.${IFACE}.ifname=wwan0
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:404:				uci set network.${IFACE}.device="/dev/cdc-wdm0"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:405:				uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:417:	[ x"$(uci -q get network.${IFACE}.usbtype)" == x"ecm" ] || {
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:441:					uci set network.${IFACE}.imei="$rimei"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:442:					uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:446:					if [ x"$(uci -q get network.${IFACE}.usbtype)" == x"ecm" ]; then
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:474:	local simslot=$(uci -q get network.${IFACE}.simslot)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:521:	local pincode=$(uci -q get network.${IFACE}.pincode${simslot})
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:527:		uci -q delete network.${IFACE}.pincode${simslot}
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:528:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:585:	local defbands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:590:				uci set network.${IFACE}.defbands="1 3 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:591:				uci set network.${IFACE}.gsmbands="93"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:594:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:595:				uci set network.${IFACE}.gsmbands="d3"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:598:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:599:				uci set network.${IFACE}.gsmbands="d0"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:602:				uci set network.${IFACE}.defbands="1 2 3 4 5 7 8 28 40 66"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:603:				uci set network.${IFACE}.gsmbands="2ff"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:606:				uci set network.${IFACE}.defbands="1 3 5 8 34 38 39 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:607:				uci set network.${IFACE}.gsmbands="d0"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:610:				uci set network.${IFACE}.defbands="2 4 5 12 13 14 66 71"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:611:				uci set network.${IFACE}.gsmbands="260"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:614:				uci set network.${IFACE}.defbands="2 4 5 7 28 66"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:615:				uci set network.${IFACE}.gsmbands="260"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:618:				uci set network.${IFACE}.defbands="1 3 8 18 19 26 41"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:619:				uci set network.${IFACE}.gsmbands="9d0"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:622:				uci set network.${IFACE}.defbands="2 4 5 7 12 13 14 25 26 29 30 41 66 71"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:623:				uci set network.${IFACE}.gsmbands="260"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:626:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:627:				uci set network.${IFACE}.gsmbands="8d0"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:630:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:631:				uci set network.${IFACE}.gsmbands="d7"
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:634:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:686:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:697:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:715:	uci delete network.${IFACE}.lasticcid${simslot}
+/tmp/lantrace/root/usr/lib/4g/quectel.sh:716:	uci commit network
+/tmp/lantrace/root/usr/lib/4g/meig.sh:6:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:7:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:8:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:9:	local search=$(uci -q get network.${IFACE}.search)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:10:	local pdptype=$(uci -q get network.${IFACE}.pdptype | tr '[a-z]' '[A-Z]')
+/tmp/lantrace/root/usr/lib/4g/meig.sh:11:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:12:	local ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:88:				local oper=$(uci -q get network.${IFACE}.oper)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:131:				local oper=$(uci -q get network.${IFACE}.oper)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:196:	local antenna=$(uci -q get network.${IFACE}.antenna)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:197:	local roaming=$(uci -q get network.${IFACE}.roaming)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:198:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:199:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:200:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:201:	local gsmbands=$(uci -q get network.${IFACE}.gsmbands)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:202:	local ltebands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:203:	local selband=$(uci -q get network.${IFACE}.selband)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:228:		ltebands=$(uci -q get network.${IFACE}.ltebands)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:273:	local imei=$(uci -q get network.${IFACE}.imei)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:274:	local magic=$(uci -q get network.${IFACE}.magic)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:275:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:322:					uci set network.${IFACE}.imei="$rimei"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:323:					uci commit network
+/tmp/lantrace/root/usr/lib/4g/meig.sh:366:	local pincode=$(uci -q get network.${IFACE}.pincode${simslot})
+/tmp/lantrace/root/usr/lib/4g/meig.sh:372:		uci -q delete network.${IFACE}.pincode${simslot}
+/tmp/lantrace/root/usr/lib/4g/meig.sh:373:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/meig.sh:386:	local defbands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/meig.sh:394:						uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:395:						uci set network.${IFACE}.gsmbands="all"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:398:						uci set network.${IFACE}.defbands="1 3 5 8 34 38 39 40 41"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:399:						uci set network.${IFACE}.gsmbands="all"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:402:						uci set network.${IFACE}.defbands="1 2 3 4 5 7 8 28 40 66"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:403:						uci set network.${IFACE}.gsmbands="all"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:411:						uci set network.${IFACE}.defbands="2 4 5 12 13 17 25 26 41"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:412:						uci set network.${IFACE}.gsmbands="all"
+/tmp/lantrace/root/usr/lib/4g/meig.sh:417:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/meig.sh:465:	uci delete network.${IFACE}.lasticcid${simslot}
+/tmp/lantrace/root/usr/lib/4g/meig.sh:466:	uci commit network
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:216:	local ifname=$(uci -q get network.${IFACE}.ifname)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:217:	local mtu=$(uci -q get network.${IFACE}.mtu)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:228:	local ifname=$(uci -q get network.${IFACE}.ifname)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:247:	local ifname=$(uci -q get network.${IFACE}.ifname)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:255:	local lasticcid=$(uci -q get network.${IFACE}.lasticcid${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:269:				uci set network.${IFACE}.lasticcid${simslot}="$iccid"
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:270:				uci commit network
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:279:				uci set network.${IFACE}.lasticcid${simslot}="$iccid"
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:280:				uci commit network
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:306:	local autoapn=$(uci -q get network.${IFACE}.autoapn)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:308:	local lasticcid=$(uci -q get network.${IFACE}.lasticcid${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:311:	local isp=$(uci -q get network.${IFACE}.isp)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:314:		local apn=$(uci -q get network.${IFACE}.apn${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:315:		local username=$(uci -q get network.${IFACE}.username${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:316:		local password=$(uci -q get network.${IFACE}.password${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:317:		local auth=$(uci -q get network.${IFACE}.auth${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:324:				fix_mtu "$(uci -q get network.${IFACE}.mtu${simslot})"
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:325:				fix_ttl "$(uci -q get network.${IFACE}.ttl${simslot})" "$(uci -q get network.${IFACE}.hl${simslot})"
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:460:	local monthly_data=$(uci -q get network.4g.monthly_data${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:461:	local total_data=$(uci -q get network.4g.total_data${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:472:	local monthly=$(uci -q get network.${IFACE}.monthly${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:473:	local limit=$(uci -q get network.${IFACE}.limit${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:474:	local data_limit=$(uci -q get network.${IFACE}.data_limit${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:500:	local monthly_date=$(uci -q get network.4g.monthly_date${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:501:	local start_date=$(uci -q get network.4g.start_date${simslot})
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:537:DEVICE=$(uci -q get network.${IFACE}.cdevice)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:538:SIMSLOT=$(uci -q get network.${IFACE}.simslot)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:539:VENDOR=$(uci -q get network.${IFACE}.vendor)
+/tmp/lantrace/root/usr/lib/4g/4gup.sh:558:[ "1" == "$(uci -q get network.${IFACE}.disabled)" -o -f "/var/run/${IFACE}/disabled" ] && {
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:5:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:6:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:7:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:8:	local search=$(uci -q get network.${IFACE}.search)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:9:	local pdptype=$(uci -q get network.${IFACE}.pdptype | tr '[a-z]' '[A-Z]')
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:10:	local gsmbands=$(uci -q get network.${IFACE}.gsmbands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:11:	local ltebands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:12:	local selband=$(uci -q get network.${IFACE}.selband)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:13:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:14:	local pcimode=$(uci -q get network.${IFACE}.pcimode)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:15:	local ipv6=$(uci -q get network.lan.ipv6)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:123:		local oper=$(uci -q get network.${IFACE}.oper)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:245:	local antenna=$(uci -q get network.${IFACE}.antenna)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:246:	local roaming=$(uci -q get network.${IFACE}.roaming)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:247:	local service=$(uci -q get network.${IFACE}.service)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:248:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:249:	local proto=$(uci -q get network.${IFACE}.proto)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:250:	local ltebands=$(uci -q get network.${IFACE}.lte_defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:251:	local nr5g_nsabands=$(uci -q get network.${IFACE}.nr5g_nsa_defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:252:	local nr5g_sabands=$(uci -q get network.${IFACE}.nr5g_sa_defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:253:	local selband=$(uci -q get network.${IFACE}.selband)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:302:		nr5g_sabands=$(uci -q get network.${IFACE}.nr5g_sabands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:303:		#nr5g_nsabands=$(uci -q get network.${IFACE}.nr5g_nsabands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:304:		nr5g_nsabands=$(uci -q get network.${IFACE}.nr5g_sabands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:305:		ltebands=$(uci -q get network.${IFACE}.ltebands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:361:	local imei=$(uci -q get network.${IFACE}.imei)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:362:	local magic=$(uci -q get network.${IFACE}.magic)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:363:	local qmbncfg=$(uci -q get network.${IFACE}.qmbncfg)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:364:	local qmbncfg_wificalling=$(uci -q get network.${IFACE}.qmbncfg_wificalling)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:411:			local ifname=$(uci -q get network.${IFACE}.ifname)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:413:				uci set network.${IFACE}.ifname=wwan0
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:414:				uci set network.${IFACE}.device="/dev/cdc-wdm0"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:415:				uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:461:					uci set network.${IFACE}.imei="$rimei"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:462:					uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:484:	local simslot=$(uci -q get network.${IFACE}.simslot)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:531:	local pincode=$(uci -q get network.${IFACE}.pincode${simslot})
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:537:		uci -q delete network.${IFACE}.pincode${simslot}
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:538:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:597:	local defbands=$(uci -q get network.${IFACE}.defbands)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:602:				uci set network.${IFACE}.defbands="1 3 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:603:				uci set network.${IFACE}.gsmbands="93"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:606:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:607:				uci set network.${IFACE}.gsmbands="d3"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:610:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:611:				uci set network.${IFACE}.gsmbands="d0"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:614:				uci set network.${IFACE}.defbands="1 2 3 4 5 7 8 28 40 66"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:615:				uci set network.${IFACE}.gsmbands="2ff"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:618:				uci set network.${IFACE}.defbands="2 4 5 12 13 14 66 71"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:619:				uci set network.${IFACE}.gsmbands="260"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:622:				uci set network.${IFACE}.defbands="2 4 5 7 28 66"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:623:				uci set network.${IFACE}.gsmbands="260"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:626:				uci set network.${IFACE}.defbands="2 4 5 7 12 13 14 25 26 29 30 41 66 71"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:627:				uci set network.${IFACE}.gsmbands="260"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:630:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:631:				uci set network.${IFACE}.gsmbands="8d0"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:634:				uci set network.${IFACE}.defbands="1 3 5 7 8 20 28 38 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:635:				uci set network.${IFACE}.gsmbands="d7"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:638:				uci set network.${IFACE}.lte_defbands="1 2 3 4 5 7 8 12 13 14 18 19 20 25 26 28 29 30 32 34 38 39 40 41 42 43 46 48 66 71"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:639:				uci set network.${IFACE}.nr5g_nsa_defbands="1 2 3 5 7 8 12 20 25 28 38 40 41 48 66 71 77 78 79"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:640:				uci set network.${IFACE}.nr5g_sa_defbands="1 2 3 5 7 8 12 20 25 28 38 40 41 48 66 71 77 78 79"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:643:				uci set network.${IFACE}.lte_defbands="1 2 3 4 5 7 8 12 13 14 17 18 19 20 25 26 28 29 30 32 34 38 39 40 41 42 43 46 48 66 71"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:644:				uci set network.${IFACE}.nr5g_nsa_defbands="1 2 3 5 7 8 12 13 14 18 20 25 26 28 29 30 38 40 41 48 66 70 71 75 76 77 78 79"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:645:				uci set network.${IFACE}.nr5g_sa_defbands="1 2 3 5 7 8 12 13 14 18 20 25 26 28 29 30 38 40 41 48 66 70 71 75 76 77 78 79"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:648:				uci set network.${IFACE}.lte_defbands="1 3 5 7 8 20 28 32 38 40 41 42 43 71"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:649:				uci set network.${IFACE}.nr5g_nsa_defbands="1 3 5 7 8 20 28 38 40 41 71 75 76 77 78"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:650:				uci set network.${IFACE}.nr5g_sa_defbands="1 3 5 7 8 20 28 38 40 41 71 75 76 77 78"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:653:				uci set network.${IFACE}.lte_defbands="1 2 3 5 7 8 20 28 34 38 39 40 41"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:654:				uci set network.${IFACE}.nr5g_nsa_defbands="1 28 41 77 78 79"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:655:				uci set network.${IFACE}.nr5g_sa_defbands="1 28 41 77 78 79"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:658:				uci set network.${IFACE}.lte_defbands="1 3 5 7 8 20 28 32 38 40 41 42 43"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:659:				uci set network.${IFACE}.nr5g_nsa_defbands="1 3 5 7 8 20 28 38 40 41 71 75 76 77 78"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:660:				uci set network.${IFACE}.nr5g_sa_defbands="1 3 5 7 8 20 28 38 40 41 71 75 76 77 78"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:663:				uci set network.${IFACE}.lte_defbands="1 2 3 4 5 7 8 20 28 38 40 41 66"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:664:				uci set network.${IFACE}.nr5g_sa_defbands="1 3 5 7 8 20 28 38 40 41 66 77 78"
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:667:		uci commit network
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:733:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:734:	local pcimode=$(uci -q get network.${IFACE}.pcimode)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:750:	local usbtype=$(uci -q get network.${IFACE}.usbtype)
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:758:	uci delete network.${IFACE}.lasticcid${simslot}
+/tmp/lantrace/root/usr/lib/4g/quectel-5g.sh:759:	uci commit network
+/tmp/lantrace/root/usr/lib/lua/luci/view/wireless/wds_check.htm:4:	local ipaddr = uci:get("system", "@system[0]", "domain") or uci:get("network", "lan", "ipaddr")
+/tmp/lantrace/root/usr/lib/lua/luci/view/wireless/wds_connect.htm:24:		if not fs.access("/sys/class/net/"..ifname.."/upper_br-wan") and not fs.access("/sys/class/net/"..ifname.."/upper_br-lan") then
+/tmp/lantrace/root/usr/lib/lua/luci/view/mesh/upgrade.htm:7:	local net = (uci:get("network", "wan", "type") == "bridge") and ntm:get_network("wan") or ntm:get_network("lan")
+/tmp/lantrace/root/usr/lib/lua/luci/view/mesh/batupgrade.htm:4:	local net = (uci:get("network", "wan", "type") == "bridge") and ntm:get_network("wan") or ntm:get_network("lan")
+/tmp/lantrace/root/usr/lib/lua/luci/view/autoupgrade/updateapply.htm:5:	local net = (uci:get("network", "wan", "type") == "bridge") and ntm:get_network("wan") or ntm:get_network("lan")
+/tmp/lantrace/root/usr/lib/diag/wan.sh:29:	local dev_switch=$(uci -q get network.@switch_vlan[0].device)
+/tmp/lantrace/root/usr/lib/diag/wan.sh:37:	uci show network >> "$WAN_LOG_FILE"
+/tmp/lantrace/root/usr/lib/diag/wan.sh:55:		local ipv6=$(uci -q get network.wan6.disabled)
+/tmp/lantrace/root/usr/lib/diag/wan.sh:71:		local ifname=$(uci -q get network.wan.def_ifname)
+/tmp/lantrace/root/usr/lib/diag/gcom.sh:36:	uci show network >> "$GCOM_LOG_FILE"
+/tmp/lantrace/root/usr/share/filter/firewall.include:27:	local lanip=$(uci get network.lan.ipaddr)
+/tmp/lantrace/root/usr/share/filter/firewall.include:28:	local lanmask=$(uci get network.lan.netmask)
+/tmp/lantrace/root/usr/share/filter/firewall.include:76:	local lanip=$(uci get network.lan.ipaddr)
+/tmp/lantrace/root/usr/share/filter/firewall.include:85:	guest_access_filter=$(uci -q get network.guest.access_filter)
+/tmp/lantrace/root/usr/share/filter/firewall.include:94:		while iptables -w -t filter -D FORWARD -i br-lan -j FILTER_RULES 2>/dev/null; do :; done
+/tmp/lantrace/root/usr/share/filter/firewall.include:97:		while ip6tables -w -t filter -D FORWARD -i br-lan -j FILTER_RULES 2>/dev/null; do :; done
+/tmp/lantrace/root/usr/share/filter/firewall.include:111:	local lanip=$(uci get network.lan.ipaddr)
+/tmp/lantrace/root/usr/share/filter/firewall.include:198:	guest_access_filter=$(uci -q get network.guest.access_filter)
+/tmp/lantrace/root/usr/share/filter/firewall.include:207:		iptables -w -t filter -I FORWARD -i br-lan -j FILTER_RULES
+/tmp/lantrace/root/usr/share/filter/firewall.include:210:		ip6tables -w -t filter -I FORWARD -i br-lan -j FILTER_RULES
+/tmp/lantrace/root/usr/share/filter/firewall.include:304:	local lanip=$(uci get network.lan.ipaddr)
+/tmp/lantrace/root/usr/share/filter/firewall.include:305:	local disabled=$(uci -q get network.guest.disabled)
+/tmp/lantrace/root/usr/share/filter/firewall.include:312:			local guestip=$(uci get network.guest.ipaddr)
+/tmp/lantrace/root/usr/share/filter/firewall.include:329:	while iptables -w -t mangle -D FORWARD -i br-lan -m ttl --ttl-gt 30 -m ttl --ttl-lt 254 -j TTL --ttl-set 64 2>/dev/null; do :; done
+/tmp/lantrace/root/usr/share/filter/firewall.include:330:	while iptables -w -t mangle -D FORWARD -i br-lan -m ttl --ttl-eq 254 -j TTL --ttl-set 255 2>/dev/null; do :; done
+/tmp/lantrace/root/usr/share/filter/firewall.include:335:		iptables -w -t mangle -A FORWARD -i br-lan -m ttl --ttl-gt 30 -m ttl --ttl-lt 254 -j TTL --ttl-set 64
+/tmp/lantrace/root/usr/share/filter/firewall.include:336:		iptables -w -t mangle -A FORWARD -i br-lan -m ttl --ttl-eq 254 -j TTL --ttl-set 255
+/tmp/lantrace/root/usr/share/filter/firewall.include:436:	local ipaddr=$(uci -q get network.lan2.ipaddr)
+/tmp/lantrace/root/usr/share/filter/firewall.include:437:	local netmask=$(uci -q get network.lan2.netmask)
+/tmp/lantrace/root/usr/share/filter/firewall.include:438:	local disabled=$(uci -q get network.lan2.disabled)
+/tmp/lantrace/root/usr/share/parental_control/firewall.include:116:	while iptables -w -t filter -D FORWARD -i br-lan -j PARENTAL_CONTROL 2>/dev/null; do :; done
+/tmp/lantrace/root/usr/share/parental_control/firewall.include:117:	while iptables -w -t filter -D FORWARD -i br-lan.8 -j PARENTAL_CONTROL 2>/dev/null; do :; done
+/tmp/lantrace/root/usr/share/parental_control/firewall.include:133:	iptables -w -t filter -I FORWARD -i br-lan.8 -j PARENTAL_CONTROL
+/tmp/lantrace/root/usr/share/parental_control/firewall.include:134:	iptables -w -t filter -I FORWARD -i br-lan -j PARENTAL_CONTROL
+/tmp/lantrace/root/usr/sbin/ppp-check.sh:9:	local proto=$(uci -q get network."$iface".proto)
+/tmp/lantrace/root/usr/sbin/ppp-check.sh:10:	local disabled=$(uci -q get network."$iface".disabled)
+/tmp/lantrace/root/usr/sbin/eqos:3:dev=br-lan
+/tmp/lantrace/root/usr/bin/zerotier.sh:59:		if [ x"$zt" = x"$(uci -q get network.vpn.ifname)" ]; then
+/tmp/lantrace/root/usr/bin/zerotier.sh:69:			uci set network.vpn.ifname="$zt"
+/tmp/lantrace/root/usr/bin/zerotier.sh:70:			uci commit network
+
+== config/bootstrap inventory ==
+/tmp/lantrace/root/etc/board.d/01_leds
+/tmp/lantrace/root/etc/board.d/02_network
+/tmp/lantrace/root/etc/board.d/99-default_network
+/tmp/lantrace/root/etc/config/cmagent
+/tmp/lantrace/root/etc/config/cmsd
+/tmp/lantrace/root/etc/config/cwmp
+/tmp/lantrace/root/etc/config/ddns
+/tmp/lantrace/root/etc/config/dhcp
+/tmp/lantrace/root/etc/config/dropbear
+/tmp/lantrace/root/etc/config/eqos
+/tmp/lantrace/root/etc/config/filter
+/tmp/lantrace/root/etc/config/firewall
+/tmp/lantrace/root/etc/config/igmpproxy
+/tmp/lantrace/root/etc/config/ipsec
+/tmp/lantrace/root/etc/config/l2tpd
+/tmp/lantrace/root/etc/config/luci
+/tmp/lantrace/root/etc/config/mosquitto
+/tmp/lantrace/root/etc/config/openvpn
+/tmp/lantrace/root/etc/config/pingcheck
+/tmp/lantrace/root/etc/config/pptpd
+/tmp/lantrace/root/etc/config/rpcd
+/tmp/lantrace/root/etc/config/stubby
+/tmp/lantrace/root/etc/config/ucitrack
+/tmp/lantrace/root/etc/config/uhttpd
+/tmp/lantrace/root/etc/config/umdns
+/tmp/lantrace/root/etc/config/upnpd
+/tmp/lantrace/root/etc/config/vpn
+/tmp/lantrace/root/etc/config/wifi_schedule
+/tmp/lantrace/root/etc/config/zerotier
+/tmp/lantrace/root/etc/init.d/arpbind
+/tmp/lantrace/root/etc/init.d/autoreboot
+/tmp/lantrace/root/etc/init.d/boot
+/tmp/lantrace/root/etc/init.d/cmagent
+/tmp/lantrace/root/etc/init.d/cmsd
+/tmp/lantrace/root/etc/init.d/cron
+/tmp/lantrace/root/etc/init.d/cwmp
+/tmp/lantrace/root/etc/init.d/ddns
+/tmp/lantrace/root/etc/init.d/dnsmasq
+/tmp/lantrace/root/etc/init.d/done
+/tmp/lantrace/root/etc/init.d/doneled
+/tmp/lantrace/root/etc/init.d/dropbear
+/tmp/lantrace/root/etc/init.d/eqos
+/tmp/lantrace/root/etc/init.d/firewall
+/tmp/lantrace/root/etc/init.d/fstab
+/tmp/lantrace/root/etc/init.d/gcom
+/tmp/lantrace/root/etc/init.d/hcsh
+/tmp/lantrace/root/etc/init.d/hyfibrd
+/tmp/lantrace/root/etc/init.d/igmpproxy
+/tmp/lantrace/root/etc/init.d/ipsec
+/tmp/lantrace/root/etc/init.d/l2tpd
+/tmp/lantrace/root/etc/init.d/led
+/tmp/lantrace/root/etc/init.d/log
+/tmp/lantrace/root/etc/init.d/miniupnpd
+/tmp/lantrace/root/etc/init.d/mosquitto
+/tmp/lantrace/root/etc/init.d/network
+/tmp/lantrace/root/etc/init.d/odhcpd
+/tmp/lantrace/root/etc/init.d/openvpn
+/tmp/lantrace/root/etc/init.d/pingcheck
+/tmp/lantrace/root/etc/init.d/pptpd
+/tmp/lantrace/root/etc/init.d/rpcd
+/tmp/lantrace/root/etc/init.d/smp
+/tmp/lantrace/root/etc/init.d/softapd
+/tmp/lantrace/root/etc/init.d/stubby
+/tmp/lantrace/root/etc/init.d/sysctl
+/tmp/lantrace/root/etc/init.d/sysfixtime
+/tmp/lantrace/root/etc/init.d/sysntpd
+/tmp/lantrace/root/etc/init.d/system
+/tmp/lantrace/root/etc/init.d/telnet
+/tmp/lantrace/root/etc/init.d/timewol
+/tmp/lantrace/root/etc/init.d/udpechoserver
+/tmp/lantrace/root/etc/init.d/uhttpd
+/tmp/lantrace/root/etc/init.d/umdns
+/tmp/lantrace/root/etc/init.d/umount
+/tmp/lantrace/root/etc/init.d/urandom_seed
+/tmp/lantrace/root/etc/init.d/usbmode
+/tmp/lantrace/root/etc/init.d/vlan
+/tmp/lantrace/root/etc/init.d/xl2tpd
+/tmp/lantrace/root/etc/init.d/zerotier
+/tmp/lantrace/root/etc/init.d/zram
+/tmp/lantrace/root/etc/uci-defaults/00_uhttpd_ubus
+/tmp/lantrace/root/etc/uci-defaults/01_network
+/tmp/lantrace/root/etc/uci-defaults/10-fstab
+/tmp/lantrace/root/etc/uci-defaults/10_user
+/tmp/lantrace/root/etc/uci-defaults/11_fix_passwd
+/tmp/lantrace/root/etc/uci-defaults/12_network-generate-ula
+/tmp/lantrace/root/etc/uci-defaults/13_fix_group_user
+/tmp/lantrace/root/etc/uci-defaults/15_firewall_filter
+/tmp/lantrace/root/etc/uci-defaults/30_4g_pingcheck
+/tmp/lantrace/root/etc/uci-defaults/30_luci-theme-bootstrap
+/tmp/lantrace/root/etc/uci-defaults/30_wlan
+/tmp/lantrace/root/etc/uci-defaults/40_luci-business
+/tmp/lantrace/root/etc/uci-defaults/40_luci-eqos
+/tmp/lantrace/root/etc/uci-defaults/40_luci-ppp
+/tmp/lantrace/root/etc/uci-defaults/40_luci-vpn
+/tmp/lantrace/root/etc/uci-defaults/40_luci-wireless
+/tmp/lantrace/root/etc/uci-defaults/40_luci-zerotier
+/tmp/lantrace/root/etc/uci-defaults/40_parental-control
+/tmp/lantrace/root/etc/uci-defaults/50_luci-openvpn
+/tmp/lantrace/root/etc/uci-defaults/60_ipv6
+/tmp/lantrace/root/etc/uci-defaults/69_ntp
+/tmp/lantrace/root/etc/uci-defaults/90_guest
+/tmp/lantrace/root/etc/uci-defaults/98-board
+/tmp/lantrace/root/etc/uci-defaults/98-cwmp
+/tmp/lantrace/root/etc/uci-defaults/99-miniupnpd
+/tmp/lantrace/root/etc/uci-defaults/99_firewall
+/tmp/lantrace/root/etc/uci-defaults/99_fixwan
+/tmp/lantrace/root/etc/uci-defaults/99_oem
+/tmp/lantrace/root/etc/uci-defaults/ddns
+/tmp/lantrace/root/etc/uci-defaults/ddns_cloudflare.com-v4
+/tmp/lantrace/root/etc/uci-defaults/ddns_no-ip_com
+/tmp/lantrace/root/etc/uci-defaults/ipsec.defaults
+/tmp/lantrace/root/etc/uci-defaults/l2tpd.defaults
+/tmp/lantrace/root/etc/uci-defaults/luci-app-control-timewol
+/tmp/lantrace/root/etc/uci-defaults/luci-arpbind
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-bn
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-ca
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-cs
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-de
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-el
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-en
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-es
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-fr
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-he
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-hr
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-hu
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-it
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-ja
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-km
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-ko
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-nl
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-no
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-pl
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-pt
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-ro
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-ru
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-sk
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-sv
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-th
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-tr
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-uk
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-vi
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-zh-cn
+/tmp/lantrace/root/etc/uci-defaults/luci-i18n-business-zh-tw
+/tmp/lantrace/root/etc/uci-defaults/odhcpd.defaults
+/tmp/lantrace/root/etc/uci-defaults/pptpd.defaults
+/tmp/lantrace/root/etc/uci-defaults/umdns.defaults
+/tmp/lantrace/root/etc/uci-defaults/wifi_schedule.defaults
+/tmp/lantrace/root/lib/config/uci.sh
+/tmp/lantrace/root/lib/functions/network.sh
+/tmp/lantrace/root/lib/preinit/00_preinit.conf
+/tmp/lantrace/root/lib/preinit/02_default_set_state
+/tmp/lantrace/root/lib/preinit/03_preinit_do_ramips.sh
+/tmp/lantrace/root/lib/preinit/09_led_preinit
+/tmp/lantrace/root/lib/preinit/10_indicate_preinit
+/tmp/lantrace/root/lib/preinit/10_sysinfo
+/tmp/lantrace/root/lib/preinit/60_mount_overlay
+/tmp/lantrace/root/lib/preinit/80_mount_root
+/tmp/lantrace/root/lib/preinit/81_urandom_seed
+/tmp/lantrace/root/lib/preinit/82_factory_mac
+/tmp/lantrace/root/lib/preinit/99_00_console
+/tmp/lantrace/root/lib/preinit/99_10_run_init
+
+== strings around literal in matching files ==
+--- /tmp/lantrace/root/etc/uci-defaults/01_network ---
+1-#!/bin/sh
+2-. /lib/ramips.sh
+3-board=$(ramips_board_name)
+4-case "$board" in
+5-R29)
+6:	uci -q get network.lan.def_ipaddr || {
+7:		uci set network.lan.def_ipaddr="192.168.10.1"
+8:		uci set network.lan.ipaddr='192.168.10.1'
+9:	uci -q get network.lan.def_ipaddr || {
+10:		uci set network.lan.def_ipaddr="192.168.10.1"
+11:		uci set network.lan.ipaddr='192.168.10.1'
+12-	uci -q get network.wisp || {
+13-		uci set network.wisp=interface
+14-		uci set network.wisp.disabled='1'
+15-		uci set network.wisp.auto='0'
+16-		uci set network.wisp.proto='dhcp'
+17-		uci set network.wisp.metric='80'
+18-		uci set network.wan.metric='60'
+19-		uci del_list firewall.@zone[1].network='wisp'
+20-		uci add_list firewall.@zone[1].network='wisp'
+21-esac
+22-uci delete firewall.@rule[3].src_ip
+23-uci delete firewall.@rule[3].dest_ip
