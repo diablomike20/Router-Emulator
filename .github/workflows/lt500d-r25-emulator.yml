@@ -76,11 +76,24 @@ jobs:
             sleep 1
           done
 
-          ok=0
+          root_ok=0
+          luci_ok=0
           if [ "$transport_ok" -eq 1 ]; then
-            echo "Probing donor root/LuCI"
-            if curl -sS --connect-timeout 1 --max-time 10 -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/; then
-              ok=1
+            echo "Probing donor root"
+            if curl -sS --connect-timeout 1 --max-time 10 -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/ &&
+               grep -q 'cgi-bin/luci/' /tmp/lt500d-r25-http-body.bin; then
+              root_ok=1
+              echo "LT500D_ROOT_REDIRECT_GATE=PASS"
+            fi
+
+            echo "Probing donor LuCI CGI"
+            if curl -sS -L --connect-timeout 1 --max-time 15 -D /tmp/lt500d-r25-luci.bin.headers -o /tmp/lt500d-r25-luci.bin http://127.0.0.1:8080/cgi-bin/luci/ &&
+               [ -s /tmp/lt500d-r25-luci.bin ] &&
+               grep -Eqi '<html|<!DOCTYPE|Cudy|LuCI|sysauth|login' /tmp/lt500d-r25-luci.bin; then
+              luci_ok=1
+              echo "LT500D_LUCI_CGI_GATE=PASS"
+              head -n 1 /tmp/lt500d-r25-luci.bin.headers || true
+              wc -c /tmp/lt500d-r25-luci.bin
             fi
           fi
 
@@ -93,8 +106,12 @@ jobs:
             echo "FAIL: hostfwd/static donor HTTP transport unavailable"
             exit 1
           fi
-          if [ "$ok" -ne 1 ]; then
-            echo "FAIL: static donor HTTP works, but donor root/LuCI did not answer"
+          if [ "$root_ok" -ne 1 ]; then
+            echo "FAIL: donor root did not return the expected LuCI redirect"
+            exit 1
+          fi
+          if [ "$luci_ok" -ne 1 ]; then
+            echo "FAIL: donor LuCI CGI did not return recognizable HTML"
             exit 1
           fi
 
@@ -171,3 +188,5 @@ jobs:
             /tmp/lt500d-r25-http-body.bin.headers
             /tmp/lt500d-r25-static.bin
             /tmp/lt500d-r25-static.bin.headers
+            /tmp/lt500d-r25-luci.bin
+            /tmp/lt500d-r25-luci.bin.headers
