@@ -73,14 +73,11 @@ jobs:
             2>/dev/null | head -1200 || true
 
           echo '=== executable/binary strings with LAN literal ==='
+          grep -RIl -a '192\.168\.10\.1' /tmp/lt500d-lantrace/root 2>/dev/null |
           while IFS= read -r p; do
-            if [ -f "$p" ]; then
-              if strings "$p" 2>/dev/null | grep -Fq '192.168.10.1'; then
-                echo "--- $p ---"
-                strings "$p" 2>/dev/null | grep -n -C 4 -E '192\.168\.10\.1|br-lan|eth0\.1|network\.lan' | head -80 || true
-              fi
-            fi
-          done < <(find /tmp/lt500d-lantrace/root -type f)
+            echo "--- $p ---"
+            strings "$p" 2>/dev/null | grep -n -C 4 -E '192\.168\.10\.1|br-lan|eth0\.1|network\.lan' | head -80 || true
+          done
 
       - name: Build emulator image from verified donor
         id: build
