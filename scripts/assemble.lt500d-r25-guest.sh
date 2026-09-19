@@ -17,4 +17,5 @@ done
 cp "$SELF/preInit.sh" "$ROOT/firmadyne/preInit.sh"
 cp "$SELF/run_service.sh" "$ROOT/firmadyne/run_service.sh"
 chmod +x "$ROOT/firmadyne/"*.sh
+ln -sf /firmadyne/busybox "$ROOT/firmadyne/sh"
 echo "PASS: LT500D R25 guest tree ready"
