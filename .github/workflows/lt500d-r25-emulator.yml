@@ -89,29 +89,45 @@ jobs:
               echo "LT500D_ROOT_REDIRECT_GATE=PASS status=$root_status"
             fi
 
-            echo "Probing donor LuCI CGI"
-            luci_status="$(curl -sS -L --connect-timeout 1 --max-time 15 -w '%{http_code}' -D /tmp/lt500d-r25-luci.bin.headers -o /tmp/lt500d-r25-luci.bin http://127.0.0.1:8080/cgi-bin/luci/ || true)"
-            echo "$luci_status" > /tmp/lt500d-r25-luci.status
-            case "$luci_status" in
-              200|301|302|303|307|308)
-                if [ -s /tmp/lt500d-r25-luci.bin ] &&
-                   grep -Eqi '<html|<!DOCTYPE|Cudy|LuCI|sysauth|login' /tmp/lt500d-r25-luci.bin; then
-                  luci_ok=1
-                  echo "LT500D_LUCI_CGI_GATE=PASS final_status=$luci_status"
-                  head -n 8 /tmp/lt500d-r25-luci.bin.headers || true
-                  wc -c /tmp/lt500d-r25-luci.bin
-                fi
-                ;;
-              403)
-                echo "LT500D_LUCI_CGI_GATE=FAIL forbidden"
-                ;;
-              5??)
-                echo "LT500D_LUCI_CGI_GATE=FAIL server_error=$luci_status"
-                ;;
-              *)
-                echo "LT500D_LUCI_CGI_GATE=FAIL status=$luci_status"
-                ;;
+            echo "Probing donor LuCI CGI from root-declared route"
+            root_luci_path="$(grep -Eo '/?cgi-bin/luci[^"'"'"'<>[:space:]]*' /tmp/lt500d-r25-http-body.bin | head -n1 || true)"
+            [ -n "$root_luci_path" ] || root_luci_path="/cgi-bin/luci"
+            case "$root_luci_path" in
+              /*) ;;
+              *) root_luci_path="/$root_luci_path" ;;
             esac
+            echo "root_luci_path=$root_luci_path"
+            printf '%s\n' "$root_luci_path" > /tmp/lt500d-r25-luci.path
+
+            luci_ok=0
+            : > /tmp/lt500d-r25-luci-attempts.txt
+            for candidate in "$root_luci_path" "${root_luci_path%/}" "/cgi-bin/luci" "/cgi-bin/luci/admin"; do
+              [ -n "$candidate" ] || continue
+              grep -Fxq "$candidate" /tmp/lt500d-r25-luci-attempts.txt 2>/dev/null && continue
+              echo "$candidate" >> /tmp/lt500d-r25-luci-attempts.txt
+              safe="$(printf '%s' "$candidate" | tr '/?&=' '____')"
+              status="$(curl -sS -L --connect-timeout 1 --max-time 15 -w '%{http_code}'                 -D "/tmp/lt500d-r25-luci${safe}.headers"                 -o "/tmp/lt500d-r25-luci${safe}.bin"                 "http://127.0.0.1:8080$candidate" || true)"
+              printf '%s %s\n' "$status" "$candidate" >> /tmp/lt500d-r25-luci-attempts.txt
+              echo "LuCI candidate $candidate -> $status"
+              if [ "$status" = "200" ] &&
+                 [ -s "/tmp/lt500d-r25-luci${safe}.bin" ] &&
+                 grep -Eqi '<html|<!DOCTYPE|Cudy|sysauth|login|Dashboard' "/tmp/lt500d-r25-luci${safe}.bin"; then
+                luci_ok=1
+                cp "/tmp/lt500d-r25-luci${safe}.headers" /tmp/lt500d-r25-luci.bin.headers
+                cp "/tmp/lt500d-r25-luci${safe}.bin" /tmp/lt500d-r25-luci.bin
+                printf '%s' "$status" > /tmp/lt500d-r25-luci.status
+                printf '%s' "$candidate" > /tmp/lt500d-r25-luci.resolved-path
+                echo "LT500D_LUCI_CGI_GATE=PASS final_status=$status path=$candidate"
+                head -n 8 /tmp/lt500d-r25-luci.bin.headers || true
+                wc -c /tmp/lt500d-r25-luci.bin
+                break
+              fi
+            done
+            if [ "$luci_ok" -ne 1 ]; then
+              printf '%s' "000" > /tmp/lt500d-r25-luci.status
+              echo "LT500D_LUCI_CGI_GATE=FAIL no_candidate_returned_valid_200_html"
+              cat /tmp/lt500d-r25-luci-attempts.txt || true
+            fi
 
             echo "Probing donor HTTPS static asset"
             https_status="$(curl -k -sS --connect-timeout 1 --max-time 10 -w '%{http_code}' -D /tmp/lt500d-r25-https.bin.headers -o /tmp/lt500d-r25-https.bin https://127.0.0.1:8443/luci-static/bootstrap/js/sysauth.js || true)"
@@ -211,6 +227,8 @@ jobs:
             echo '```text'
             [ -f /tmp/lt500d-r25-root.status ] && echo "root=$(cat /tmp/lt500d-r25-root.status)"
             [ -f /tmp/lt500d-r25-luci.status ] && echo "luci_final=$(cat /tmp/lt500d-r25-luci.status)"
+            [ -f /tmp/lt500d-r25-luci.resolved-path ] && echo "luci_path=$(cat /tmp/lt500d-r25-luci.resolved-path)"
+            [ -f /tmp/lt500d-r25-luci-attempts.txt ] && cat /tmp/lt500d-r25-luci-attempts.txt
             [ -f /tmp/lt500d-r25-https.status ] && echo "https_static=$(cat /tmp/lt500d-r25-https.status)"
             grep -E 'LT500D_(LAN_UCI|LAN_IP)_GATE=PASS' "$SERIAL" | tail -n 4 || true
             echo '```'
@@ -242,6 +260,9 @@ jobs:
             /tmp/lt500d-r25-luci.bin
             /tmp/lt500d-r25-luci.bin.headers
             /tmp/lt500d-r25-luci.status
+            /tmp/lt500d-r25-luci.path
+            /tmp/lt500d-r25-luci.resolved-path
+            /tmp/lt500d-r25-luci-attempts.txt
             /tmp/lt500d-r25-root.status
             /tmp/lt500d-r25-https.bin
             /tmp/lt500d-r25-https.bin.headers
