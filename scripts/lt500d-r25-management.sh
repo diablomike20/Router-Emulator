@@ -22,8 +22,10 @@ fail() {
   exit 1
 }
 
-# Wait for the donor-generated/runtime UCI network config.  The R25 SquashFS
-# does not contain a static /etc/config/network in the extracted rootfs.
+# Wait for the donor-generated/runtime UCI network config.  The extracted
+# SquashFS has no static /etc/config/network; /etc/uci-defaults/01_network
+# generates it at first boot.  The image builder patches that donor source
+# from .1 to .2, so runtime code here verifies rather than rewrites it.
 i=0
 lan_ip=""
 while [ "$i" -lt 90 ]; do
@@ -34,20 +36,10 @@ while [ "$i" -lt 90 ]; do
 done
 [ -n "$lan_ip" ] || fail "network.lan.ipaddr did not appear in runtime UCI"
 
-case "$lan_ip" in
-  192.168.10.1)
-    console_log "moving emulator donor LAN 192.168.10.1 -> 192.168.10.2"
-    uci set network.lan.ipaddr='192.168.10.2' || fail "uci set network.lan.ipaddr failed"
-    uci commit network || fail "uci commit network failed"
-    ifup lan >/dev/console 2>&1 || fail "ifup lan failed after emulator LAN rewrite"
-    ;;
-  192.168.10.2)
-    console_log "emulator donor LAN already 192.168.10.2"
-    ;;
-  *)
-    fail "unexpected donor network.lan.ipaddr=$lan_ip; refusing blind rewrite"
-    ;;
-esac
+[ "$lan_ip" = "192.168.10.2" ] ||
+  fail "unexpected donor network.lan.ipaddr=$lan_ip; expected patched first-boot default 192.168.10.2"
+
+console_log "LT500D_LAN_UCI_GATE=PASS network.lan.ipaddr=192.168.10.2"
 
 # Require the address to be live, not merely present in UCI.
 i=0
