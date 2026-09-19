@@ -1,5 +1,8 @@
 name: LT500D R25 emulator gate
 
+permissions:
+  contents: write
+
 on:
   push:
     branches:
@@ -23,6 +26,7 @@ jobs:
           sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 libdigest-sha-perl
 
       - name: Download official Cudy R25 2.4.16 firmware
+        id: firmware
         run: |
           set -euo pipefail
           URL='https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip?v=5016960833307663900'
@@ -37,6 +41,7 @@ jobs:
           cp "$FLASH" /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin
 
       - name: Build emulator image from verified donor
+        id: build
         run: |
           set -euo pipefail
           bash scripts/make.lt500d-r25-emulator.macos.sh             /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin             scratch/lt500d-r25
@@ -81,6 +86,58 @@ jobs:
             kill "$(cat /tmp/lt500d-r25-qemu.pid)" 2>/dev/null || true
           fi
 
+      - name: Persist emulator evidence
+        if: always()
+        env:
+          FIRMWARE_OUTCOME: ${{ steps.firmware.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+        run: |
+          set +e
+          mkdir -p evidence
+          SERIAL=evidence/RE-LT500D-R25-qemu.serial.log
+          RESULT=evidence/RE-LT500D-R25-EMULATOR-CI-RESULT.md
+          if [ -f scratch/lt500d-r25/qemu.serial.log ]; then
+            cp scratch/lt500d-r25/qemu.serial.log "$SERIAL"
+          else
+            : > "$SERIAL"
+          fi
+          {
+            echo '# RE-LT500D R25 emulator CI result'
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo "Firmware download/verify: $FIRMWARE_OUTCOME"
+            echo "Image build: $BUILD_OUTCOME"
+            echo "QEMU/HTTP gate: $GATE_OUTCOME"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            if [ -f /tmp/lt500d-r25-http-body.bin.headers ]; then
+              echo '## HTTP headers'
+              echo '```text'
+              head -n 40 /tmp/lt500d-r25-http-body.bin.headers
+              echo '```'
+            fi
+            if [ -f /tmp/lt500d-r25-http-body.bin ]; then
+              echo
+              echo '## HTTP body summary'
+              echo '```text'
+              wc -c /tmp/lt500d-r25-http-body.bin
+              file /tmp/lt500d-r25-http-body.bin || true
+              echo '```'
+            fi
+            echo
+            echo '## Serial tail'
+            echo '```text'
+            tail -n 220 "$SERIAL"
+            echo '```'
+          } > "$RESULT"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add evidence/RE-LT500D-R25-EMULATOR-CI-RESULT.md evidence/RE-LT500D-R25-qemu.serial.log
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record LT500D R25 emulator CI evidence'
+            git push origin HEAD:lt500d-r25-emulator-v1 || true
+          fi
       - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
