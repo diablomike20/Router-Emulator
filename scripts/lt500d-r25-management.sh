@@ -2,7 +2,7 @@
 # Cudy LT500D V2 / R25 emulator-only LAN attachment shim.
 # Fidelity class: COMPATIBILITY_SHIMMED.
 #
-# The donor itself owns br-lan=192.168.10.1/24.  Do not give the emulator
+# The emulator copy of the donor owns br-lan=192.168.10.2/24.  Do not give the emulator
 # management NIC a second management subnet; attach it to the donor LAN so
 # LuCI sees the request as LAN traffic, like on the physical router.
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
@@ -28,7 +28,7 @@ ifconfig eth1 0.0.0.0 up
 if ! brctl show br-lan 2>/dev/null | grep -qw eth1; then
   brctl addif br-lan eth1
 fi
-log "eth1 attached to donor br-lan; donor br-lan address retained"
+log "eth1 attached to donor br-lan; emulator donor br-lan address retained"
 
 dump_diag() {
   console_log "network diagnostic begin"
