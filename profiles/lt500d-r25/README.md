@@ -51,3 +51,8 @@ resulting kernel + image can be launched on Intel macOS with
 
 Success requires an actual HTTP response from `127.0.0.1:8080`, not merely an
 `uhttpd` process or listening socket inside the guest.
+
+
+## Donor architecture
+
+Donor metadata: LEDE 17.01.5 / build 2.4.16; target ramips/mt7628; architecture mipsel_24kc. The v1 launcher therefore pins qemu-system-mipsel, Malta compatibility machine, and 24Kc CPU. Malta is an emulation compatibility choice, not MT7628 hardware-fidelity evidence.
