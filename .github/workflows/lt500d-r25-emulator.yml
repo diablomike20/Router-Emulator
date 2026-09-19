@@ -56,8 +56,8 @@ jobs:
           echo "$QEMU_PID" > /tmp/lt500d-r25-qemu.pid
 
           ok=0
-          for i in $(seq 1 90); do
-            if curl -sS --connect-timeout 1 --max-time 2 -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/; then
+          for i in $(seq 1 60); do
+            if curl -sS --connect-timeout 0.5 --max-time 1 -D /tmp/lt500d-r25-http-body.bin.headers -o /tmp/lt500d-r25-http-body.bin http://127.0.0.1:8080/; then
               ok=1
               break
             fi
@@ -69,7 +69,7 @@ jobs:
           done
 
           if [ "$ok" -ne 1 ]; then
-            LT500D_CONNECT_TIMEOUT=1 LT500D_MAX_TIME=2 bash scripts/smoke.lt500d-r25-http.sh /tmp/lt500d-r25-http-body.bin && ok=1 || true
+            LT500D_CONNECT_TIMEOUT=0.5 LT500D_MAX_TIME=1 bash scripts/smoke.lt500d-r25-http.sh /tmp/lt500d-r25-http-body.bin && ok=1 || true
           fi
 
           echo "=== serial tail ==="
