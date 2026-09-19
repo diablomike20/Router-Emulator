@@ -19,7 +19,7 @@ exec qemu-system-mipsel \
   -m 256 \
   -kernel "$KERNEL" \
   -drive if=ide,format=raw,file="$IMAGE" \
-  -append "firmadyne.syscall=1 root=/dev/sda1 console=ttyS0 rw debug ignore_loglevel print-fatal-signals=1 FIRMAE_NET=true FIRMAE_NVRAM=true FIRMAE_KERNEL=true FIRMAE_ETC=true user_debug=31 $EXTRA_ARGS" \
+  -append "firmadyne.syscall=1 root=/dev/sda1 console=ttyS0 rw debug ignore_loglevel print-fatal-signals=1 FIRMAE_NET=true FIRMAE_NVRAM=true FIRMAE_KERNEL=true FIRMAE_ETC=true user_debug=31 LT500D_EMU=R25 $EXTRA_ARGS" \
   -device e1000,netdev=donor0 \
   -netdev user,id=donor0,net=10.0.3.0/24 \
   -device e1000,netdev=mgmt1 \
