@@ -6,7 +6,7 @@ if [ "$#" -lt 2 ]; then echo "Usage: $0 <prepared-rootfs-dir> <image.raw> [size-
 ROOTFS="$(cd "$1" && pwd)"
 OUT="$2"
 SIZE="${3:-512}"
-for c in qemu-img mke2fs genext2fs fakeroot; do command -v "$c" >/dev/null || { echo "Missing $c"; exit 1; }; done
+for c in qemu-img genext2fs fakeroot; do command -v "$c" >/dev/null || { echo "Missing $c"; exit 1; }; done
 [ -x "$ROOTFS/sbin/procd" ] || { echo "Not an OpenWrt/Cudy rootfs: missing sbin/procd"; exit 1; }
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
