@@ -18,16 +18,48 @@ function Fail([string]$Message) {
     throw $Message
 }
 
-function Test-Wsl2 {
+function Resolve-WslDistro {
     if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
-        Fail "wsl.exe not found. Enable WSL2 and install Ubuntu first."
+        Write-Host ""
+        Write-Host "WSL is not installed." -ForegroundColor Yellow
+        Write-Host "Open PowerShell as Administrator and run:"
+        Write-Host "  wsl --install -d Ubuntu" -ForegroundColor Cyan
+        Write-Host "Then reboot if Windows requests it and launch Ubuntu once."
+        exit 2
     }
-    $kernel = (& wsl.exe bash -lc "uname -r" 2>$null | Out-String).Trim()
+
+    $distros = @(& wsl.exe --list --quiet 2>$null | ForEach-Object { ($_ -replace [char]0, '').Trim() } | Where-Object { $_ })
+    if ($distros.Count -eq 0) {
+        Write-Host ""
+        Write-Host "WSL is present, but no Linux distribution is installed." -ForegroundColor Yellow
+        Write-Host "Open PowerShell as Administrator and run:"
+        Write-Host "  wsl --list --online" -ForegroundColor Cyan
+        Write-Host "  wsl --install -d Ubuntu" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "If the Store download fails:"
+        Write-Host "  wsl --install --web-download -d Ubuntu" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Reboot if requested, launch Ubuntu once, and create the Linux user/password."
+        Write-Host "Then rerun this launcher and choose Setup."
+        exit 2
+    }
+
+    $ubuntu = $distros | Where-Object { $_ -match '^Ubuntu($|-)' } | Select-Object -First 1
+    if ($ubuntu) { $script:WslDistro = $ubuntu } else { $script:WslDistro = $distros[0] }
+    Write-Host "Using WSL distribution: $script:WslDistro"
+}
+
+function Test-Wsl2 {
+    Resolve-WslDistro
+    $kernel = (& wsl.exe -d "$script:WslDistro" -- bash -lc "uname -r" 2>$null | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($kernel)) {
-        Fail "No usable default WSL distribution. Install Ubuntu under WSL2 first."
+        Fail "The selected WSL distribution could not start: $script:WslDistro"
     }
     if ($kernel -notmatch "WSL2|microsoft-standard") {
-        Fail "This port requires WSL2. Current WSL kernel: $kernel"
+        Write-Host "The selected distribution is not running as WSL2." -ForegroundColor Yellow
+        Write-Host "Run in PowerShell as Administrator:"
+        Write-Host ('  wsl --set-version "' + $script:WslDistro + '" 2') -ForegroundColor Cyan
+        exit 2
     }
     Write-Host "PASS WSL2 kernel: $kernel"
 }
@@ -37,7 +69,7 @@ function To-WslPath([string]$Path) {
     if ($full.Contains("'")) {
         Fail "Paths containing apostrophes are not supported: $full"
     }
-    $result = (& wsl.exe wslpath -a -u "$full" | Out-String).Trim()
+    $result = (& wsl.exe -d "$script:WslDistro" -- wslpath -a -u "$full" | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($result)) {
         Fail "Could not convert Windows path to WSL path: $full"
     }
@@ -63,7 +95,7 @@ for c in bash python3 unsquashfs qemu-system-mipsel qemu-img curl shasum mke2fs 
 done
 exit "$missing"
 '@
-    & wsl.exe bash -lc $probe
+    & wsl.exe -d "$script:WslDistro" -- bash -lc $probe
     if ($LASTEXITCODE -ne 0) {
         Fail "Missing WSL dependencies. Run this script with Action Setup."
     }
@@ -78,7 +110,7 @@ switch ($Action) {
         Test-Wsl2
         Write-Host "Installing emulator dependencies inside WSL2..."
         $install = "export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 perl libdigest-sha-perl ca-certificates file binutils"
-        & wsl.exe -u root bash -lc $install
+        & wsl.exe -d "$script:WslDistro" -u root -- bash -lc $install
         if ($LASTEXITCODE -ne 0) {
             Fail "WSL dependency installation failed."
         }
@@ -121,7 +153,7 @@ switch ($Action) {
         ) -join "; "
 
         Write-Host "Building LT500D emulator under WSL2..."
-        & wsl.exe bash -lc $cmd
+        & wsl.exe -d "$script:WslDistro" -- bash -lc $cmd
         if ($LASTEXITCODE -ne 0) {
             Fail "LT500D Windows 10 / WSL2 build failed."
         }
@@ -156,7 +188,7 @@ switch ($Action) {
         Write-Host "HTTPS: https://127.0.0.1:8443"
         Write-Host "Serial: $logWindows"
         Write-Host "This window remains attached to QEMU. Run Action Smoke in a second PowerShell window."
-        & wsl.exe bash -lc $cmd
+        & wsl.exe -d "$script:WslDistro" -- bash -lc $cmd
         exit $LASTEXITCODE
     }
 
@@ -164,7 +196,7 @@ switch ($Action) {
         Invoke-Check
         $repoWsl = To-WslPath $repoRoot
         $cmd = "set -e; cd " + (Q $repoWsl) + "; chmod +x scripts/*.sh; bash scripts/smoke.lt500d-r25-http.sh /tmp/RE-lt500d-r25-win10-smoke"
-        & wsl.exe bash -lc $cmd
+        & wsl.exe -d "$script:WslDistro" -- bash -lc $cmd
         if ($LASTEXITCODE -ne 0) {
             Fail "LT500D Windows 10 / WSL2 smoke gate failed."
         }
