@@ -16,5 +16,7 @@ else
 fi
 check usr/sbin/lt500d-r25-management 'LT500D_LAN_UCI_GATE=PASS'
 check usr/sbin/lt500d-r25-management 'LT500D_LAN_IP_GATE=PASS'
+check usr/sbin/lt500d-r25-management 'INPUT -i br-lan -s 192.168.10.254'
+check usr/sbin/lt500d-r25-management 'OUTPUT -o br-lan -d 192.168.10.254'
 [ -x "$ROOT/usr/sbin/lt500d-r25-management" ] && echo "PASS management shim executable" || { echo "FAIL management shim executable"; fail=1; }
 exit "$fail"
