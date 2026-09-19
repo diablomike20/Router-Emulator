@@ -148,16 +148,16 @@ jobs:
           cp profiles/lt500d-r25/RE-WINDOWS10.md "$DIST/$RELEASE_NAME-windows10-wsl2-x86_64/profiles/lt500d-r25/"
 
           for root in "$DIST"/"$RELEASE_NAME"-*; do
-            cat > "$root/RE-RELEASE-RUNTIME-VERIFICATION.txt" <<EOF
-release=$RELEASE_NAME
-source_commit=$GITHUB_SHA
-donor_sha256=$DONOR_SHA
-linux_runtime_ci=PASS
-macos_runtime_ci=PASS
-windows_launcher_static_ci=PASS
-windows_runtime=WSL2_REQUIRED
-fidelity=COMPATIBILITY_SHIMMED
-EOF
+            printf '%s\n' \
+              "release=$RELEASE_NAME" \
+              "source_commit=$GITHUB_SHA" \
+              "donor_sha256=$DONOR_SHA" \
+              "linux_runtime_ci=PASS" \
+              "macos_runtime_ci=PASS" \
+              "windows_launcher_static_ci=PASS" \
+              "windows_runtime=WSL2_REQUIRED" \
+              "fidelity=COMPATIBILITY_SHIMMED" \
+              > "$root/RE-RELEASE-RUNTIME-VERIFICATION.txt"
             chmod +x "$root"/scripts/*.sh
             (cd "$DIST" && zip -qr "$(basename "$root").zip" "$(basename "$root")")
           done
@@ -171,31 +171,31 @@ EOF
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cat > /tmp/notes.md <<'EOF'
-# RE-LT500D-R25-EMULATOR v1.0.1
-
-Three host-specific packages are provided:
-
-- Linux x86_64
-- macOS x86_64
-- Windows 10/11 x86_64 via WSL2
-
-## v1.0.1 changes
-
-- Windows launcher now detects installed WSL distributions instead of assuming a usable default.
-- Missing Ubuntu/WSL setup now produces actionable installation instructions instead of a PowerShell stack trace.
-- Release packaging now includes the required `verify.lt500d-r25-rootfs.sh`.
-- Linux and macOS receive single-entry Setup/Check/Build/Start/Smoke wrappers.
-- Linux and macOS are runtime-gated independently before publication.
-- Windows BAT and PowerShell launchers are syntax/static-gated; Windows runtime requires a local WSL2 installation.
-
-Factory Cudy firmware is not redistributed.
-
-Emulator LAN: `192.168.10.2/24`.
-Host HTTP: `127.0.0.1:8080`.
-Host HTTPS: `127.0.0.1:8443`.
-
-Fidelity: `COMPATIBILITY_SHIMMED`.
-EOF
+          printf '%s\n' \
+            '# RE-LT500D-R25-EMULATOR v1.0.1' \
+            '' \
+            'Three host-specific packages are provided:' \
+            '' \
+            '- Linux x86_64' \
+            '- macOS x86_64' \
+            '- Windows 10/11 x86_64 via WSL2' \
+            '' \
+            '## v1.0.1 changes' \
+            '' \
+            '- Windows launcher now detects installed WSL distributions instead of assuming a usable default.' \
+            '- Missing Ubuntu/WSL setup now produces actionable installation instructions instead of a PowerShell stack trace.' \
+            '- Release packaging now includes the required verify.lt500d-r25-rootfs.sh.' \
+            '- Linux and macOS receive single-entry Setup/Check/Build/Start/Smoke wrappers.' \
+            '- Linux and macOS are runtime-gated independently before publication.' \
+            '- Windows BAT and PowerShell launchers are syntax/static-gated; Windows runtime requires a local WSL2 installation.' \
+            '' \
+            'Factory Cudy firmware is not redistributed.' \
+            '' \
+            'Emulator LAN: 192.168.10.2/24.' \
+            'Host HTTP: 127.0.0.1:8080.' \
+            'Host HTTPS: 127.0.0.1:8443.' \
+            '' \
+            'Fidelity: COMPATIBILITY_SHIMMED.' \
+            > /tmp/notes.md
           gh release create "$RELEASE_TAG"             dist/"$RELEASE_NAME"-linux-x86_64.zip             dist/"$RELEASE_NAME"-macos-x86_64.zip             dist/"$RELEASE_NAME"-windows10-wsl2-x86_64.zip             dist/"$RELEASE_NAME"-SHA256SUMS.txt             --target "$GITHUB_SHA"             --title "$RELEASE_NAME"             --notes-file /tmp/notes.md             --repo "$GITHUB_REPOSITORY"
           echo "RELEASE_V101_PUBLISH_GATE=PASS"
