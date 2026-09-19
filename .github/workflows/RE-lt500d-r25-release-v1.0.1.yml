@@ -77,7 +77,7 @@ jobs:
           echo "LINUX_RUNTIME_GATE=PASS"
 
   macos-runtime:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
