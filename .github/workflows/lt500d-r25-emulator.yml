@@ -44,6 +44,44 @@ jobs:
           echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
           cp "$FLASH" /tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin
 
+      - name: Trace donor LAN default source
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/lt500d-lantrace
+          mkdir -p /tmp/lt500d-lantrace/root
+          dd if=/tmp/LT500V2-R25-2.4.16-20250804-150319-flash.bin \
+             of=/tmp/lt500d-lantrace/root.squashfs bs=1 skip=$((0x2a7d4d)) status=none
+          unsquashfs -d /tmp/lt500d-lantrace/root /tmp/lt500d-lantrace/root.squashfs >/tmp/lt500d-lantrace/unsquash.log 2>&1 || true
+
+          echo '=== direct 192.168.10.1 text hits ==='
+          grep -RIna --binary-files=without-match --exclude='*.ko' --exclude='*.so*' \
+            '192\.168\.10\.1' /tmp/lt500d-lantrace/root 2>/dev/null || true
+
+          echo '=== files containing literal 192.168.10.1, including binaries ==='
+          grep -RIl -a '192\.168\.10\.1' /tmp/lt500d-lantrace/root 2>/dev/null || true
+
+          echo '=== likely network/bootstrap sources ==='
+          find /tmp/lt500d-lantrace/root \
+            \( -path '*/etc/config*' -o -path '*/etc/uci-defaults*' -o -path '*/etc/board.d*' \
+               -o -path '*/lib/preinit*' -o -path '*/lib/functions*' -o -path '*/etc/init.d*' \) \
+            -type f -maxdepth 8 -print | sort | head -400
+
+          echo '=== br-lan / eth0.1 / network.lan references ==='
+          grep -RIna --binary-files=without-match -E \
+            'br-lan|eth0\.1|network\.lan|lan\.ipaddr|option[[:space:]]+ipaddr|uci.*network' \
+            /tmp/lt500d-lantrace/root/etc /tmp/lt500d-lantrace/root/lib /tmp/lt500d-lantrace/root/usr \
+            2>/dev/null | head -1200 || true
+
+          echo '=== executable/binary strings with LAN literal ==='
+          while IFS= read -r p; do
+            if [ -f "$p" ]; then
+              if strings "$p" 2>/dev/null | grep -Fq '192.168.10.1'; then
+                echo "--- $p ---"
+                strings "$p" 2>/dev/null | grep -n -C 4 -E '192\.168\.10\.1|br-lan|eth0\.1|network\.lan' | head -80 || true
+              fi
+            fi
+          done < <(find /tmp/lt500d-lantrace/root -type f)
+
       - name: Build emulator image from verified donor
         id: build
         run: |
