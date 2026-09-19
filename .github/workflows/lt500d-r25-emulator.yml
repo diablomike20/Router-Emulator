@@ -101,38 +101,86 @@ jobs:
 
             luci_ok=0
             : > /tmp/lt500d-r25-luci-attempts.txt
+            : > /tmp/lt500d-r25-luci.cookies
             for candidate in "$root_luci_path" "${root_luci_path%/}" "/cgi-bin/luci" "/cgi-bin/luci/admin"; do
               [ -n "$candidate" ] || continue
-              grep -Fxq "$candidate" /tmp/lt500d-r25-luci-attempts.txt 2>/dev/null && continue
-              echo "$candidate" >> /tmp/lt500d-r25-luci-attempts.txt
-              safe="$(printf '%s' "$candidate" | tr '/?&=' '____')"
-              status="$(curl -sS -L --connect-timeout 1 --max-time 15 -w '%{http_code}'                 -D "/tmp/lt500d-r25-luci${safe}.headers"                 -o "/tmp/lt500d-r25-luci${safe}.bin"                 "http://127.0.0.1:8080$candidate" || true)"
-              printf '%s %s\n' "$status" "$candidate" >> /tmp/lt500d-r25-luci-attempts.txt
-              echo "LuCI candidate $candidate -> $status"
-              if [ "$status" != "200" ]; then
-                echo "--- LuCI candidate body head: $candidate ---"
-                head -c 900 "/tmp/lt500d-r25-luci${safe}.bin" 2>/dev/null || true
-                echo
-                echo "--- LuCI candidate headers: $candidate ---"
-                head -n 20 "/tmp/lt500d-r25-luci${safe}.headers" 2>/dev/null || true
-              fi
-              if [ "$status" = "200" ] &&
-                 [ -s "/tmp/lt500d-r25-luci${safe}.bin" ] &&
-                 grep -Eqi '<html|<!DOCTYPE|Cudy|sysauth|login|Dashboard' "/tmp/lt500d-r25-luci${safe}.bin"; then
-                luci_ok=1
-                cp "/tmp/lt500d-r25-luci${safe}.headers" /tmp/lt500d-r25-luci.bin.headers
-                cp "/tmp/lt500d-r25-luci${safe}.bin" /tmp/lt500d-r25-luci.bin
-                printf '%s' "$status" > /tmp/lt500d-r25-luci.status
-                printf '%s' "$candidate" > /tmp/lt500d-r25-luci.resolved-path
-                echo "LT500D_LUCI_CGI_GATE=PASS final_status=$status path=$candidate"
-                head -n 8 /tmp/lt500d-r25-luci.bin.headers || true
-                wc -c /tmp/lt500d-r25-luci.bin
-                break
-              fi
+              grep -Fq "candidate=$candidate" /tmp/lt500d-r25-luci-attempts.txt 2>/dev/null && continue
+              echo "candidate=$candidate" >> /tmp/lt500d-r25-luci-attempts.txt
+
+              current_scheme=http
+              current_path="$candidate"
+              for hop in 1 2 3 4 5 6; do
+                safe="$(printf '%s_%s_%s' "$candidate" "$hop" "$current_scheme" | tr '/?&=:' '_____')"
+                if [ "$current_scheme" = https ]; then
+                  local_url="https://127.0.0.1:8443$current_path"
+                  curl_tls=-k
+                else
+                  local_url="http://127.0.0.1:8080$current_path"
+                  curl_tls=
+                fi
+
+                status="$(curl $curl_tls -sS --connect-timeout 1 --max-time 15                   -H 'Host: cudy.net'                   -b /tmp/lt500d-r25-luci.cookies -c /tmp/lt500d-r25-luci.cookies                   -w '%{http_code}'                   -D "/tmp/lt500d-r25-luci${safe}.headers"                   -o "/tmp/lt500d-r25-luci${safe}.bin"                   "$local_url" || true)"
+                printf 'hop=%s scheme=%s path=%s status=%s\n' "$hop" "$current_scheme" "$current_path" "$status" >> /tmp/lt500d-r25-luci-attempts.txt
+                echo "LuCI local hop $hop $current_scheme://cudy.net$current_path -> $status"
+
+                if [ "$status" = 200 ]; then
+                  if [ -s "/tmp/lt500d-r25-luci${safe}.bin" ] &&
+                     grep -Eqi '<html|<!DOCTYPE|Cudy|sysauth|login|Dashboard|Quick Setup' "/tmp/lt500d-r25-luci${safe}.bin"; then
+                    luci_ok=1
+                    cp "/tmp/lt500d-r25-luci${safe}.headers" /tmp/lt500d-r25-luci.bin.headers
+                    cp "/tmp/lt500d-r25-luci${safe}.bin" /tmp/lt500d-r25-luci.bin
+                    printf '%s' "$status" > /tmp/lt500d-r25-luci.status
+                    printf '%s://cudy.net%s' "$current_scheme" "$current_path" > /tmp/lt500d-r25-luci.resolved-path
+                    echo "LT500D_LUCI_CGI_GATE=PASS final_status=$status path=$current_scheme://cudy.net$current_path"
+                    head -n 12 /tmp/lt500d-r25-luci.bin.headers || true
+                    wc -c /tmp/lt500d-r25-luci.bin
+                    break
+                  fi
+                  echo "LuCI 200 body was not recognizable donor HTML"
+                  head -c 900 "/tmp/lt500d-r25-luci${safe}.bin" 2>/dev/null || true
+                  echo
+                  break
+                fi
+
+                case "$status" in
+                  301|302|303|307|308)
+                    location="$(awk 'BEGIN{IGNORECASE=1} /^Location:/ {sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print}' "/tmp/lt500d-r25-luci${safe}.headers" | tail -n1)"
+                    echo "redirect=$location" >> /tmp/lt500d-r25-luci-attempts.txt
+                    echo "LuCI redirect -> $location"
+                    case "$location" in
+                      http://cudy.net/*)
+                        current_scheme=http
+                        current_path="/${location#http://cudy.net/}"
+                        ;;
+                      https://cudy.net/*)
+                        current_scheme=https
+                        current_path="/${location#https://cudy.net/}"
+                        ;;
+                      /*)
+                        current_path="$location"
+                        ;;
+                      *)
+                        echo "REFUSE_EXTERNAL_OR_AMBIGUOUS_REDIRECT=$location"
+                        break
+                        ;;
+                    esac
+                    ;;
+                  *)
+                    echo "--- LuCI candidate body head ---"
+                    head -c 900 "/tmp/lt500d-r25-luci${safe}.bin" 2>/dev/null || true
+                    echo
+                    echo "--- LuCI candidate headers ---"
+                    head -n 20 "/tmp/lt500d-r25-luci${safe}.headers" 2>/dev/null || true
+                    break
+                    ;;
+                esac
+              done
+              [ "$luci_ok" -eq 1 ] && break
             done
+
             if [ "$luci_ok" -ne 1 ]; then
               printf '%s' "000" > /tmp/lt500d-r25-luci.status
-              echo "LT500D_LUCI_CGI_GATE=FAIL no_candidate_returned_valid_200_html"
+              echo "LT500D_LUCI_CGI_GATE=FAIL no_local_redirect_chain_returned_valid_200_html"
               cat /tmp/lt500d-r25-luci-attempts.txt || true
             fi
 
