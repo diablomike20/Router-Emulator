@@ -1,0 +1,526 @@
+RE LT500D R25 DONOR CGI/UHTTPD TRACE
+====================================
+
+== www/cgi-bin inventory ==
+total 12
+drwxr-xr-x 2 runner runner 4096 Aug  4  2025 .
+drwxr-xr-x 4 runner runner 4096 Aug  4  2025 ..
+-rwxr-xr-x 1 runner runner  135 Aug  4  2025 luci
+
+== luci CGI metadata ==
+  File: /tmp/cgitrace/root/www/cgi-bin/luci
+  Size: 135       	Blocks: 8          IO Block: 4096   regular file
+Device: 8,1	Inode: 8938732     Links: 1
+Access: (0755/-rwxr-xr-x)  Uid: ( 1001/  runner)   Gid: ( 1001/  runner)
+Access: 2025-08-04 06:55:57.000000000 +0000
+Modify: 2025-08-04 06:55:57.000000000 +0000
+Change: 2026-09-19 08:47:02.529480731 +0000
+ Birth: 2026-09-19 08:47:02.429481343 +0000
+/tmp/cgitrace/root/www/cgi-bin/luci: Lua script, ASCII text executable
+/tmp/cgitrace/root/www/cgi-bin/luci
+
+== luci CGI first 80 lines / strings ==
+#!/usr/bin/lua
+require "luci.cacheloader"
+require "luci.sgi.cgi"
+luci.dispatcher.indexcache = "/tmp/luci-indexcache"
+luci.sgi.cgi.run()#!/usr/bin/lua
+require "luci.cacheloader"
+require "luci.sgi.cgi"
+luci.dispatcher.indexcache = "/tmp/luci-indexcache"
+luci.sgi.cgi.run()
+
+== /etc/config/uhttpd ==
+# Server configuration
+config uhttpd main
+
+	# HTTP listen addresses, multiple allowed
+	list listen_http	0.0.0.0:80
+	list listen_http	[::]:80
+
+	# HTTPS listen addresses, multiple allowed
+	list listen_https	0.0.0.0:443
+	list listen_https	[::]:443
+
+	# Redirect HTTP requests to HTTPS if possible
+	option force_https	0
+
+	# Server document root
+	option home		/www
+
+	# Reject requests from RFC1918 IP addresses
+	# directed to the servers public IP(s).
+	# This is a DNS rebinding countermeasure.
+	option rfc1918_filter 0
+
+	# Maximum number of concurrent requests.
+	# If this number is exceeded, further requests are
+	# queued until the number of running requests drops
+	# below the limit again.
+	option max_requests 3
+
+	# Maximum number of concurrent connections.
+	# If this number is exceeded, further TCP connection
+	# attempts are queued until the number of active
+	# connections drops below the limit again.
+	option max_connections 100
+
+	# Certificate and private key for HTTPS.
+	# If no listen_https addresses are given,
+	# the key options are ignored.
+	option cert		/etc/uhttpd.crt
+	option key		/etc/uhttpd.key
+
+	# CGI url prefix, will be searched in docroot.
+	# Default is /cgi-bin
+	option cgi_prefix	/cgi-bin
+
+	# List of extension->interpreter mappings.
+	# Files with an associated interpreter can
+	# be called outside of the CGI prefix and do
+	# not need to be executable.
+#	list interpreter	".php=/usr/bin/php-cgi"
+#	list interpreter	".cgi=/usr/bin/perl"
+
+	# List of prefix->Lua handler mappings.
+	# Any request to an URL beneath the prefix
+	# will be dispatched to the associated Lua
+	# handler script. Lua support is disabled when
+	# no handler mappings are specified. Lua prefix
+	# matches have precedence over the CGI prefix.
+	list lua_prefix		"/cgi-bin/luci=/usr/lib/lua/luci/sgi/uhttpd.lua"
+
+	# Specify the ubus-rpc prefix and socket path.
+#	option ubus_prefix	/ubus
+#	option ubus_socket	/var/run/ubus.sock
+
+	# CGI/Lua timeout, if the called script does not
+	# write data within the given amount of seconds,
+	# the server will terminate the request with
+	# 504 Gateway Timeout response.
+	option script_timeout	60
+
+	# Network timeout, if the current connection is
+	# blocked for the specified amount of seconds,
+	# the server will terminate the associated
+	# request process.
+	option network_timeout	30
+
+	# HTTP Keep-Alive, specifies the timeout for persistent
+	# HTTP/1.1 connections. Setting this to 0 will disable
+	# persistent HTTP connections.
+	option http_keepalive	20
+
+	# TCP Keep-Alive, send periodic keep-alive probes
+	# over established connections to detect dead peers.
+	# The value is given in seconds to specify the
+	# interval between subsequent probes.
+	# Setting this to 0 will disable TCP keep-alive.
+	option tcp_keepalive	1
+
+	# Basic auth realm, defaults to local hostname
+#	option realm	OpenWrt
+
+	# Configuration file in busybox httpd format
+#	option config	/etc/httpd.conf
+
+	# Do not follow symlinks that point outside of the
+	# home directory.
+#	option no_symlinks	0
+
+	# Do not produce directory listings but send 403
+	# instead if a client requests an url pointing to
+	# a directory without any index file.
+#	option no_dirlists	0
+
+	# Do not authenticate any ubus-rpc requests against
+	# the ubus session/access procedure.
+	# This is dangerous and should be always left off
+	# except for development and debug purposes!
+#	option no_ubusauth	0
+
+	# For this instance of uhttpd use the listed httpauth
+	# sections to require Basic auth to the specified
+	# resources.
+#	list httpauth prefix_user
+
+
+# Defaults for automatic certificate and key generation
+config cert defaults
+
+	# Validity time
+	option days		7300
+
+	# RSA key size
+	option bits		2048
+
+	# Location
+	option country		ZZ
+	option state		Somewhere
+	option location		Unknown
+
+	# Common name
+	option commonname	'LEDE'
+
+# config httpauth prefix_user
+#	option prefix /protected/url/path
+#	option username user
+#	option password 'plaintext_or_md5_or_$p$user_for_system_user'
+
+== /etc/init.d/uhttpd ==
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2010 Jo-Philipp Wich
+
+START=50
+
+USE_PROCD=1
+
+UHTTPD_BIN="/usr/sbin/uhttpd"
+PX5G_BIN="/usr/sbin/px5g"
+OPENSSL_BIN="/usr/bin/openssl"
+
+append_arg() {
+	local cfg="$1"
+	local var="$2"
+	local opt="$3"
+	local def="$4"
+	local val
+
+	config_get val "$cfg" "$var"
+	[ -n "$val" -o -n "$def" ] && procd_append_param command "$opt" "${val:-$def}"
+}
+
+append_bool() {
+	local cfg="$1"
+	local var="$2"
+	local opt="$3"
+	local def="$4"
+	local val
+
+	config_get_bool val "$cfg" "$var" "$def"
+	[ "$val" = 1 ] && procd_append_param command "$opt"
+}
+
+generate_keys() {
+	local cfg="$1"
+	local key="$2"
+	local crt="$3"
+	local days bits country state location commonname
+
+	config_get days       "$cfg" days
+	config_get bits       "$cfg" bits
+	config_get country    "$cfg" country
+	config_get state      "$cfg" state
+	config_get location   "$cfg" location
+
+	commonname=$(uci_get system.@system[0].domain)
+	[ -n "$commonname" ] || config_get commonname "$cfg" commonname
+
+	# Prefer px5g for certificate generation (existence evaluated last)
+	local GENKEY_CMD=""
+	local UNIQUEID=$(dd if=/dev/urandom bs=1 count=4 | hexdump -e '1/1 "%02x"')
+	[ -x "$OPENSSL_BIN" ] && GENKEY_CMD="$OPENSSL_BIN req -x509 -sha256 -outform der -nodes"
+	[ -x "$PX5G_BIN" ] && GENKEY_CMD="$PX5G_BIN selfsigned -der"
+	[ -n "$GENKEY_CMD" ] && {
+		$GENKEY_CMD \
+			-days ${days:-7300} -newkey rsa:${bits:-2048} -keyout "${UHTTPD_KEY}.new" -out "${UHTTPD_CERT}.new" \
+			-subj /C="${country:-ZZ}"/CN="${commonname:-OpenWrt}"
+		sync
+		mv "${UHTTPD_KEY}.new" "${UHTTPD_KEY}"
+		mv "${UHTTPD_CERT}.new" "${UHTTPD_CERT}"
+	}
+}
+
+create_httpauth() {
+	local cfg="$1"
+	local prefix username password
+
+	config_get prefix "$cfg" prefix
+	config_get username "$cfg" username
+	config_get password "$cfg" password
+
+	if [ -z "$prefix" ] || [ -z "$username" ] || [ -z "$password" ]; then
+		return
+	fi
+	echo "${prefix}:${username}:${password}" >>$httpdconf
+	haveauth=1
+}
+
+append_lua_prefix() {
+	local v="$1"
+	local prefix="${v%%=*}"
+	local handler="${v#*=}"
+
+	if [ "$prefix" != "$handler" ] && [ -n "$prefix" ] && [ -f "$handler" ]; then
+		procd_append_param command -l "$prefix" -L "$handler"
+	else
+		echo "Skipping invalid Lua prefix \"$v\"" >&2
+	fi
+}
+
+start_instance()
+{
+	UHTTPD_CERT=""
+	UHTTPD_KEY=""
+
+	local cfg="$1"
+	local realm="$(uci_get system.@system[0].hostname)"
+	local disabled listen http https interpreter indexes path handler httpdconf haveauth
+
+	config_get_bool disabled "$cfg" disabled 0
+	[ "$disabled" -gt 0 ] && return 0
+
+	procd_open_instance
+	procd_set_param respawn
+	procd_set_param stderr 1
+	procd_set_param command "$UHTTPD_BIN" -f
+
+	config_get config "$cfg" config
+	if [ -z "$config" ]; then
+		mkdir -p /var/etc/uhttpd
+		httpdconf="/var/etc/uhttpd/httpd.${cfg}.conf"
+		rm -f ${httpdconf}
+		config_list_foreach "$cfg" httpauth create_httpauth
+		if [ "$haveauth" = "1" ]; then
+			procd_append_param command -c ${httpdconf}
+			[ -r /etc/httpd.conf ] && cat /etc/httpd.conf >>/var/etc/uhttpd/httpd.${cfg}.conf
+		fi
+	fi
+
+	append_arg "$cfg" home "-h"
+	append_arg "$cfg" realm "-r" "${realm:-OpenWrt}"
+	append_arg "$cfg" config "-c"
+	append_arg "$cfg" cgi_prefix "-x"
+	[ -f /usr/lib/uhttpd_lua.so ] && {
+		local len
+		config_get len "$cfg" lua_prefix_LENGTH
+
+		if [ -n "$len" ]; then
+			config_list_foreach "$cfg" lua_prefix append_lua_prefix
+		else
+			config_get prefix "$cfg" lua_prefix
+			config_get handler "$cfg" lua_handler
+			append_lua_prefix "$prefix=$handler"
+		fi
+	}
+	[ -f /usr/lib/uhttpd_ubus.so ] && {
+		append_arg "$cfg" ubus_prefix "-u"
+		append_arg "$cfg" ubus_socket "-U"
+		append_bool "$cfg" ubus_cors "-X" 0
+	}
+	append_arg "$cfg" script_timeout "-t"
+	append_arg "$cfg" network_timeout "-T"
+	append_arg "$cfg" http_keepalive "-k"
+	append_arg "$cfg" tcp_keepalive "-A"
+	append_arg "$cfg" error_page "-E"
+	append_arg "$cfg" max_requests "-n" 3
+	append_arg "$cfg" max_connections "-N"
+
+	append_bool "$cfg" no_ubusauth "-a" 0
+	append_bool "$cfg" no_symlinks "-S" 0
+	append_bool "$cfg" no_dirlists "-D" 0
+	append_bool "$cfg" rfc1918_filter "-R" 0
+
+	config_get alias_list "$cfg" alias
+	for alias in $alias_list; do
+		 procd_append_param command -y "$alias"
+	done
+
+	config_get http "$cfg" listen_http
+	for listen in $http; do
+		 procd_append_param command -p "$listen"
+	done
+
+	config_get interpreter "$cfg" interpreter
+	for path in $interpreter; do
+		procd_append_param command -i "$path"
+	done
+
+	config_get indexes "$cfg" index_page
+	for path in $indexes; do
+		procd_append_param command -I "$path"
+	done
+
+	config_get https "$cfg" listen_https
+	config_get UHTTPD_KEY  "$cfg" key  /etc/uhttpd.key
+	config_get UHTTPD_CERT "$cfg" cert /etc/uhttpd.crt
+
+	[ -f /lib/libustream-ssl.so ] && [ -n "$https" ] && {
+		[ -s "$UHTTPD_CERT" -a -s "$UHTTPD_KEY" ] || {
+			config_foreach generate_keys cert
+		}
+
+		[ -f "$UHTTPD_CERT" -a -f "$UHTTPD_KEY" ] && {
+			append_arg "$cfg" cert "-C"
+			append_arg "$cfg" key  "-K"
+
+			for listen in $https; do
+				procd_append_param command -s "$listen"
+			done
+		}
+
+		#append_bool "$cfg" force_https "-q" 0
+	}
+
+	for file in /etc/uhttpd/*.json; do
+		[ -s "$file" ] && procd_append_param command -H "$file"
+	done
+
+	mac=$(bdinfo mac)
+	sysauth=$(uci_get luci.main.sysauth)
+	[ -n "$mac" -a -n "$sysauth" -a -f /usr/lib/lua/luci/jsonrpc.lua ] && {
+		rpba=${mac:0:2}:${mac:2:2}:${mac:4:2}:${mac:6:2}:${mac:8:2}:${mac:10:2}
+		model=$(uci_get system.@system[0].hostname)
+		rom=$(uci_get system.board.rom)
+		group=$(uci_get system.board.groups)
+		[ -n "$group" ] || group=$(uci_get system.board.def_type)
+		showuser=$(uci_get luci.main.showuser)
+		devname=$(uci_get system.board.devname)
+		salt=$(uci_get luci.sauth.salt)
+		revision=$(cat /etc/rom_version | awk -F- '{print $1}')
+		sign="$(echo -n ${rpba}${model}${rom}${group} | md5sum | cut -f1 -d' ')"
+		if [ x"$(uci_get uhttpd.main.force_https)" == x"1" ]; then
+			port=443
+		else
+			port=80
+		fi
+		if [ -n "$salt" ]; then
+			procd_add_mdns "http" "tcp" "$port" "model=$model" devname="${devname:-$model}" "rom=$rom" "group=$group" "rpBA=$rpba" "user=$showuser" "revision=$revision|50|5" "salt=$salt" "sign=$sign"
+		else
+			procd_add_mdns "http" "tcp" "$port" "model=$model" devname="${devname:-$model}" "rom=$rom" "group=$group" "rpBA=$rpba" "user=$showuser" "revision=$revision|50|5" "sign=$sign"
+		fi
+	}
+	procd_close_instance
+}
+
+service_triggers()
+{
+	procd_add_reload_trigger "uhttpd"
+}
+
+start_service() {
+	config_load uhttpd
+	config_foreach start_instance uhttpd
+}
+
+== uhttpd references ==
+/tmp/cgitrace/root/etc/ddns/services:21:"dnshome.de"		"http://[USERNAME]:[PASSWORD]@www.dnshome.de/dyndns.php?hostname=[DOMAIN]&ip=[IP]"
+/tmp/cgitrace/root/etc/ddns/services_ipv6:13:"dnshome.de"		"http://[USERNAME]:[PASSWORD]@www.dnshome.de/dyndns.php?hostname=[DOMAIN]&ip6=[IP]"
+/tmp/cgitrace/root/etc/config/uhttpd:2:config uhttpd main
+/tmp/cgitrace/root/etc/config/uhttpd:5:	list listen_http	0.0.0.0:80
+/tmp/cgitrace/root/etc/config/uhttpd:6:	list listen_http	[::]:80
+/tmp/cgitrace/root/etc/config/uhttpd:9:	list listen_https	0.0.0.0:443
+/tmp/cgitrace/root/etc/config/uhttpd:10:	list listen_https	[::]:443
+/tmp/cgitrace/root/etc/config/uhttpd:16:	option home		/www
+/tmp/cgitrace/root/etc/config/uhttpd:36:	# If no listen_https addresses are given,
+/tmp/cgitrace/root/etc/config/uhttpd:38:	option cert		/etc/uhttpd.crt
+/tmp/cgitrace/root/etc/config/uhttpd:39:	option key		/etc/uhttpd.key
+/tmp/cgitrace/root/etc/config/uhttpd:42:	# Default is /cgi-bin
+/tmp/cgitrace/root/etc/config/uhttpd:43:	option cgi_prefix	/cgi-bin
+/tmp/cgitrace/root/etc/config/uhttpd:45:	# List of extension->interpreter mappings.
+/tmp/cgitrace/root/etc/config/uhttpd:46:	# Files with an associated interpreter can
+/tmp/cgitrace/root/etc/config/uhttpd:49:#	list interpreter	".php=/usr/bin/php-cgi"
+/tmp/cgitrace/root/etc/config/uhttpd:50:#	list interpreter	".cgi=/usr/bin/perl"
+/tmp/cgitrace/root/etc/config/uhttpd:58:	list lua_prefix		"/cgi-bin/luci=/usr/lib/lua/luci/sgi/uhttpd.lua"
+/tmp/cgitrace/root/etc/config/uhttpd:95:	# home directory.
+/tmp/cgitrace/root/etc/config/uhttpd:109:	# For this instance of uhttpd use the listed httpauth
+/tmp/cgitrace/root/etc/stubby/stubby.yml.default:135:# subdirectory in the user's home directory on Unixes, and the %appdata%\getdns
+/tmp/cgitrace/root/etc/stubby/stubby.yml.default:136:# directory on Windows. If there is no home directory, or
+/tmp/cgitrace/root/etc/stubby/stubby.yml.default:141:# When stubby runs as a special system-level user without a home directory
+/tmp/cgitrace/root/etc/uci-defaults/40_luci-business:46:	del ucitrack.@uhttpd[-1]
+/tmp/cgitrace/root/etc/uci-defaults/40_luci-business:47:        add ucitrack uhttpd
+/tmp/cgitrace/root/etc/uci-defaults/40_luci-business:48:        set ucitrack.@uhttpd[-1].init=uhttpd
+/tmp/cgitrace/root/etc/uci-defaults/00_uhttpd_ubus:3:if [ -z "$(uci -q get uhttpd.main.ubus_prefix)" ]; then
+/tmp/cgitrace/root/etc/uci-defaults/00_uhttpd_ubus:4:	uci set uhttpd.main.ubus_prefix=/ubus
+/tmp/cgitrace/root/etc/uci-defaults/00_uhttpd_ubus:5:	uci commit uhttpd
+/tmp/cgitrace/root/etc/uci-defaults/00_uhttpd_ubus:8:if [ x"$(uci -q uhttpd.main.rfc1918_filter)" == x"1" ]; then
+/tmp/cgitrace/root/etc/uci-defaults/00_uhttpd_ubus:9:	uci set uhttpd.main.rfc1918_filter='0'
+/tmp/cgitrace/root/etc/uci-defaults/00_uhttpd_ubus:10:	uci set uhttpd.defaults.days='7300'
+/tmp/cgitrace/root/etc/uci-defaults/00_uhttpd_ubus:11:	uci commit uhttpd
+/tmp/cgitrace/root/etc/init.d/uhttpd:8:UHTTPD_BIN="/usr/sbin/uhttpd"
+/tmp/cgitrace/root/etc/init.d/uhttpd:79:append_lua_prefix() {
+/tmp/cgitrace/root/etc/init.d/uhttpd:98:	local disabled listen http https interpreter indexes path handler httpdconf haveauth
+/tmp/cgitrace/root/etc/init.d/uhttpd:110:		mkdir -p /var/etc/uhttpd
+/tmp/cgitrace/root/etc/init.d/uhttpd:111:		httpdconf="/var/etc/uhttpd/httpd.${cfg}.conf"
+/tmp/cgitrace/root/etc/init.d/uhttpd:116:			[ -r /etc/httpd.conf ] && cat /etc/httpd.conf >>/var/etc/uhttpd/httpd.${cfg}.conf
+/tmp/cgitrace/root/etc/init.d/uhttpd:120:	append_arg "$cfg" home "-h"
+/tmp/cgitrace/root/etc/init.d/uhttpd:123:	append_arg "$cfg" cgi_prefix "-x"
+/tmp/cgitrace/root/etc/init.d/uhttpd:124:	[ -f /usr/lib/uhttpd_lua.so ] && {
+/tmp/cgitrace/root/etc/init.d/uhttpd:126:		config_get len "$cfg" lua_prefix_LENGTH
+/tmp/cgitrace/root/etc/init.d/uhttpd:129:			config_list_foreach "$cfg" lua_prefix append_lua_prefix
+/tmp/cgitrace/root/etc/init.d/uhttpd:131:			config_get prefix "$cfg" lua_prefix
+/tmp/cgitrace/root/etc/init.d/uhttpd:133:			append_lua_prefix "$prefix=$handler"
+/tmp/cgitrace/root/etc/init.d/uhttpd:136:	[ -f /usr/lib/uhttpd_ubus.so ] && {
+/tmp/cgitrace/root/etc/init.d/uhttpd:159:	config_get http "$cfg" listen_http
+/tmp/cgitrace/root/etc/init.d/uhttpd:164:	config_get interpreter "$cfg" interpreter
+/tmp/cgitrace/root/etc/init.d/uhttpd:165:	for path in $interpreter; do
+/tmp/cgitrace/root/etc/init.d/uhttpd:174:	config_get https "$cfg" listen_https
+/tmp/cgitrace/root/etc/init.d/uhttpd:175:	config_get UHTTPD_KEY  "$cfg" key  /etc/uhttpd.key
+/tmp/cgitrace/root/etc/init.d/uhttpd:176:	config_get UHTTPD_CERT "$cfg" cert /etc/uhttpd.crt
+/tmp/cgitrace/root/etc/init.d/uhttpd:195:	for file in /etc/uhttpd/*.json; do
+/tmp/cgitrace/root/etc/init.d/uhttpd:212:		if [ x"$(uci_get uhttpd.main.force_https)" == x"1" ]; then
+/tmp/cgitrace/root/etc/init.d/uhttpd:228:	procd_add_reload_trigger "uhttpd"
+/tmp/cgitrace/root/etc/init.d/uhttpd:232:	config_load uhttpd
+/tmp/cgitrace/root/etc/init.d/uhttpd:233:	config_foreach start_instance uhttpd
+/tmp/cgitrace/root/etc/passwd:3:ftp:*:55:55:ftp:/home/ftp:/bin/false
+/tmp/cgitrace/root/lib/functions.sh:345:	local home="${5:-/var/run/$1}"
+/tmp/cgitrace/root/lib/functions.sh:358:	echo "${name}:x:${uid}:${gid}:${desc}:${home}:${shell}" >> ${IPKG_INSTROOT}/etc/passwd
+/tmp/cgitrace/root/lib/upgrade/luci-add-conffiles.sh:10:	# save uhttpd certs
+/tmp/cgitrace/root/lib/upgrade/luci-add-conffiles.sh:11:	[ -f "/etc/uhttpd.key" ] && echo /etc/uhttpd.key >> $filelist
+/tmp/cgitrace/root/lib/upgrade/luci-add-conffiles.sh:12:	[ -f "/etc/uhttpd.crt" ] && echo /etc/uhttpd.crt >> $filelist
+/tmp/cgitrace/root/lib/upgrade/keep.d/uhttpd:1:/etc/uhttpd.crt
+/tmp/cgitrace/root/lib/upgrade/keep.d/uhttpd:2:/etc/uhttpd.key
+/tmp/cgitrace/root/usr/lib/opkg/status:49: /etc/config/uhttpd 5a865952d11174d4f49bac992f876d2fdef4cec5b9739d2c29cc9eca6daadcfc
+/tmp/cgitrace/root/usr/lib/4g/iccid.sh:271:ICCID_894920_1="DEU*Gigacube*home.vodafone.de*IPV4*none***"
+/tmp/cgitrace/root/usr/lib/4g/iccid.sh:598:ICCID_890126_4="USA*T Mobile*fbb.home*IPV4V6*none***"
+/tmp/cgitrace/root/usr/lib/lua/luci/view/redirect.htm:80:		window.location.replace("/cgi-bin/luci/");
+/tmp/cgitrace/root/usr/lib/lua/luci/view/redirect.htm:133:					<span><a target="_top" id="cbi-redirect" href="/cgi-bin/luci/"><%:Waiting for initialized...%></a></span>
+/tmp/cgitrace/root/usr/lib/lua/luci/view/gcom/upgrade.htm:30:									window.location.href="/cgi-bin/luci/";
+/tmp/cgitrace/root/usr/lib/lua/luci/view/themes/bootstrap/sysauth.htm:29:				<form class="form-horizontal" role="form" method="post" action="/cgi-bin/luci/admin/wizard">
+/tmp/cgitrace/root/usr/lib/lua/luci/view/themes/bootstrap/sysauth.htm:31:				<form class="form-horizontal" role="form" method="post" action="/cgi-bin/luci/">
+/tmp/cgitrace/root/usr/lib/lua/luci/view/parental_control/redirect.htm:40:									window.location.href = "/cgi-bin/luci/admin/parental_control?active=<%=active%>";
+/tmp/cgitrace/root/usr/lib/lua/luci/view/parental_control/apply.htm:10:		<button class="btn btn-block btn-danger" type="button" onclick="cbi_show_modal('#cbi-modal', '/cgi-bin/luci/admin/parental_control/group/del_profile', 'group=<%=self.group%>')"><%:Delete Profile%></button>
+/tmp/cgitrace/root/usr/lib/lua/luci/view/wizard.htm:178:								window.location.href="/cgi-bin/luci/";
+/tmp/cgitrace/root/usr/lib/lua/luci/view/wizard.htm:221:				window.location.href="/cgi-bin/luci/";
+/tmp/cgitrace/root/usr/lib/lua/luci/view/wizard.htm:225:			window.location.href="/cgi-bin/luci/";
+/tmp/cgitrace/root/usr/lib/lua/luci/view/system/administration.htm:5:		uci:set("uhttpd", "main", "force_https", force_https)
+/tmp/cgitrace/root/usr/lib/lua/luci/view/system/administration.htm:6:		uci:commit("uhttpd")
+/tmp/cgitrace/root/usr/lib/libstdc++.so.6.0.21-gdb.py:22:pythondir = '/home/jenkins/workspace/mtk_mt762x_router_v2.4/openwrt/17.01/staging_dir/toolchain-mipsel_24kc_gcc-5.4.0_musl-1.1.16/share/gcc-5.4.0/python'
+/tmp/cgitrace/root/usr/lib/libstdc++.so.6.0.21-gdb.py:23:libdir = '/home/jenkins/workspace/mtk_mt762x_router_v2.4/openwrt/17.01/staging_dir/toolchain-mipsel_24kc_gcc-5.4.0_musl-1.1.16/mipsel-openwrt-linux-musl/lib'
+/tmp/cgitrace/root/usr/share/openvpn/openvpn.options:168:multihome
+/tmp/cgitrace/root/usr/bin/tr069/cwmp-upgrd:47:	sys.fork_exec("sleep 1; /etc/init.d/uhttpd stop; /sbin/sysupgrade %q" % image_tmp)
+
+== root index ==
+  File: /tmp/cgitrace/root/www/index.html
+  Size: 604       	Blocks: 8          IO Block: 4096   regular file
+Device: 8,1	Inode: 8938734     Links: 1
+Access: (0644/-rw-r--r--)  Uid: ( 1001/  runner)   Gid: ( 1001/  runner)
+Access: 2025-08-04 06:55:57.000000000 +0000
+Modify: 2025-08-04 06:55:57.000000000 +0000
+Change: 2026-09-19 08:47:02.529480731 +0000
+ Birth: 2026-09-19 08:47:02.429481343 +0000
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+                <meta http-equiv="Expires" content="0" />
+		<meta http-equiv="refresh" content="0; URL=cgi-bin/luci/" />
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'; form-action 'none'">
+	</head>
+	<body>
+		<a href="cgi-bin/luci/"></a>
+	</body>
+</html>
+
+== LuCI runtime files ==
+-rw-r--r-- 1 runner runner   260 Aug  4  2025 /tmp/cgitrace/root/usr/lib/lua/luci/cacheloader.lua
+-rw-r--r-- 1 runner runner 26859 Aug  4  2025 /tmp/cgitrace/root/usr/lib/lua/luci/dispatcher.lua
+-rw-r--r-- 1 runner runner  1667 Aug  4  2025 /tmp/cgitrace/root/usr/lib/lua/luci/sgi/cgi.lua
+
+== Lua / uhttpd binaries ==
+/tmp/cgitrace/root/usr/bin/lua:     ELF 32-bit LSB executable, MIPS, MIPS32 rel2 version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-mipsel-sf.so.1, no section header
+/tmp/cgitrace/root/usr/sbin/uhttpd: ELF 32-bit LSB executable, MIPS, MIPS32 rel2 version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-mipsel-sf.so.1, no section header
+-rwxr-xr-x 1 runner runner  8239 Aug  4  2025 /tmp/cgitrace/root/usr/bin/lua
+-rwxr-xr-x 1 runner runner 37288 Aug  4  2025 /tmp/cgitrace/root/usr/sbin/uhttpd
