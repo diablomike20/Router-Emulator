@@ -42,8 +42,26 @@ with open(dst, "wb") as f:
     f.write(data)
 print("squashfs_bytes=%d" % len(data))
 PY
-unsquashfs -d "$DONOR" "$SQUASH" >/dev/null
-[ -x "$DONOR/sbin/procd" ] || { echo "Extracted donor rootfs missing /sbin/procd"; exit 1; }
+EXTRACT_LOG="$WORK/unsquashfs.log"
+set +e
+unsquashfs -d "$DONOR" "$SQUASH" >"$EXTRACT_LOG" 2>&1
+EXTRACT_RC=$?
+set -e
+if [ "$EXTRACT_RC" -ne 0 ]; then
+  echo "WARN: unsquashfs returned $EXTRACT_RC; validating donor tree before continuing"
+  tail -n 30 "$EXTRACT_LOG" || true
+fi
+for required in \
+  sbin/procd \
+  bin/busybox \
+  etc/preinit \
+  lib/ramips.sh \
+  lib/preinit/82_factory_mac \
+  etc/rc.local
+do
+  [ -e "$DONOR/$required" ] || { echo "Extracted donor rootfs missing /$required"; exit 1; }
+done
+[ -x "$DONOR/sbin/procd" ] || { echo "Extracted donor /sbin/procd is not executable"; exit 1; }
 
 echo "[3/6] Copy donor rootfs (extraction remains untouched)"
 rm -rf "$GUEST"
