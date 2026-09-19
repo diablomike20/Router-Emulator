@@ -5,8 +5,9 @@ ROOT="$(cd "$1" && pwd)"
 RAMIPS="$ROOT/lib/ramips.sh"
 FACTORY="$ROOT/lib/preinit/82_factory_mac"
 RCLOCAL="$ROOT/etc/rc.local"
+NETWORK_DEFAULTS="$ROOT/etc/uci-defaults/01_network"
 SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
-for f in "$RAMIPS" "$FACTORY" "$RCLOCAL"; do [ -f "$f" ] || { echo "Missing donor file: $f"; exit 1; }; done
+for f in "$RAMIPS" "$FACTORY" "$RCLOCAL" "$NETWORK_DEFAULTS"; do [ -f "$f" ] || { echo "Missing donor file: $f"; exit 1; }; done
 
 python3 - "$RAMIPS" <<'PY'
 from pathlib import Path
@@ -37,6 +38,28 @@ if marker not in s:
     p.write_text(s.replace(old, new, 1))
 PY
 
+
+python3 - "$NETWORK_DEFAULTS" <<'PY'
+from pathlib import Path
+import sys
+
+p = Path(sys.argv[1])
+s = p.read_text()
+
+old_def = 'uci set network.lan.def_ipaddr="192.168.10.1"'
+new_def = 'uci set network.lan.def_ipaddr="192.168.10.2"'
+old_ip = "uci set network.lan.ipaddr='192.168.10.1'"
+new_ip = "uci set network.lan.ipaddr='192.168.10.2'"
+
+if new_def in s or new_ip in s:
+    if s.count(new_def) != 2 or s.count(new_ip) != 2:
+        raise SystemExit("partial LT500D emulator LAN patch detected; refusing mixed defaults")
+else:
+    if s.count(old_def) != 2 or s.count(old_ip) != 2:
+        raise SystemExit("unexpected donor 01_network LAN defaults; refusing blind patch")
+    s = s.replace(old_def, new_def).replace(old_ip, new_ip)
+    p.write_text(s)
+PY
 
 install -m 0755 "$SELF_DIR/lt500d-r25-management.sh" "$ROOT/usr/sbin/lt500d-r25-management"
 
