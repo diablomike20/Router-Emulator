@@ -1,4 +1,5 @@
 name: RE LT500D R25 emulator release v1.0.1
+# macOS build uses a case-sensitive temporary volume for Linux rootfs extraction.
 
 permissions:
   contents: write

@@ -6,6 +6,11 @@ for c in qemu-system-mipsel qemu-img curl python3 unsquashfs; do
 done
 find_e2tool() {
  local n="$1" p
+ if [ "$(uname -s)" = "Darwin" ]; then
+   for p in "/usr/local/opt/e2fsprogs/sbin/$n" "/opt/homebrew/opt/e2fsprogs/sbin/$n"; do
+     [ -x "$p" ] && { echo "$p"; return; }
+   done
+ fi
  p="$(command -v "$n" || true)"
  [ -n "$p" ] && { echo "$p"; return; }
  for p in "/usr/local/opt/e2fsprogs/sbin/$n" "/opt/homebrew/opt/e2fsprogs/sbin/$n"; do

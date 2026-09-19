@@ -30,9 +30,35 @@ case "$ACTION" in
     ;;
   Build)
     [ "$#" -ge 1 ] || { usage; exit 1; }
-    FW="$1"
+    FW="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
     WORK="${2:-$ROOT/scratch/lt500d-r25-macos}"
-    "$ROOT/scripts/make.lt500d-r25-emulator.macos.sh" "$FW" "$WORK"
+    mkdir -p "$WORK"
+    WORK="$(cd "$WORK" && pwd)"
+
+    # The donor SquashFS contains Linux filenames that differ only by case
+    # (for example xt_DSCP.ko / xt_dscp.ko). Default macOS APFS is normally
+    # case-insensitive, so extract/build inside a temporary HFSX volume.
+    TMP="$(mktemp -d)"
+    DISK="$TMP/RE-LT500D-case-sensitive.sparseimage"
+    MOUNT="$TMP/mnt"
+    mkdir -p "$MOUNT"
+    cleanup_case_volume() {
+      hdiutil detach "$MOUNT" -quiet >/dev/null 2>&1 || true
+      rm -rf "$TMP"
+    }
+    trap cleanup_case_volume EXIT INT TERM
+
+    hdiutil create -quiet -size 2g -type SPARSE -fs HFSX -volname RE_LT500D_CASE "$DISK"
+    hdiutil attach -quiet -mountpoint "$MOUNT" "$DISK"
+    CASE_WORK="$MOUNT/work"
+    mkdir -p "$CASE_WORK"
+
+    "$ROOT/scripts/make.lt500d-r25-emulator.macos.sh" "$FW" "$CASE_WORK"
+    cp "$CASE_WORK/image.raw" "$WORK/image.raw"
+    [ ! -f "$CASE_WORK/unsquashfs.log" ] || cp "$CASE_WORK/unsquashfs.log" "$WORK/unsquashfs.log"
+    sync
+    cleanup_case_volume
+    trap - EXIT INT TERM
     echo "MACOS_BUILD_GATE=PASS image=$WORK/image.raw"
     ;;
   Start)

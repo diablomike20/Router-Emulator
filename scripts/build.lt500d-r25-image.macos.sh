@@ -9,6 +9,13 @@ SIZE="${3:-512}"
 
 find_e2tool() {
   local n="$1" p
+  # On macOS prefer Homebrew e2fsprogs over unrelated tools that may share
+  # the same executable name (for example Android SDK mke2fs).
+  if [ "$(uname -s)" = "Darwin" ]; then
+    for p in "/usr/local/opt/e2fsprogs/sbin/$n" "/opt/homebrew/opt/e2fsprogs/sbin/$n"; do
+      [ -x "$p" ] && { echo "$p"; return; }
+    done
+  fi
   p="$(command -v "$n" || true)"
   [ -n "$p" ] && { echo "$p"; return; }
   for p in "/usr/local/opt/e2fsprogs/sbin/$n" "/opt/homebrew/opt/e2fsprogs/sbin/$n"; do
