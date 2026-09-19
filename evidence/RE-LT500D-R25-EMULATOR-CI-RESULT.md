@@ -1,10 +1,10 @@
 # RE-LT500D R25 emulator CI result
 
-Commit: d92b356025368d7000f40b78e980f842862ffc98
+Commit: b779a7e215be3452fe69a582c5ad49ea2c5c2cc9
 Firmware download/verify: success
 Image build: success
 QEMU/HTTP gate: failure
-Run: https://github.com/diablomike20/Router-Emulator/actions/runs/35433044787
+Run: https://github.com/diablomike20/Router-Emulator/actions/runs/35433171895
 
 ## HTTP headers
 ```text
@@ -13,7 +13,7 @@ Connection: Keep-Alive
 Keep-Alive: timeout=20
 ETag: "a19-25c-6890597d"
 Last-Modified: Mon, 04 Aug 2025 06:55:57 GMT
-Date: Sat, 19 Sep 2026 08:51:18 GMT
+Date: Sat, 19 Sep 2026 08:53:53 GMT
 Content-Type: text/html
 Content-Length: 604
 
@@ -29,12 +29,10 @@ Content-Length: 604
 ```text
 root=200
 luci_final=000
-/cgi-bin/luci/
-404 /cgi-bin/luci/
-/cgi-bin/luci
-404 /cgi-bin/luci
-/cgi-bin/luci/admin
-404 /cgi-bin/luci/admin
+candidate=/cgi-bin/luci/
+hop=1 scheme=http path=/cgi-bin/luci/ status=403
+candidate=/cgi-bin/luci/admin
+hop=1 scheme=http path=/cgi-bin/luci/admin status=403
 https_static=200
 [LT500D-EMU] LT500D_LAN_UCI_GATE=PASS network.lan.ipaddr=192.168.10.2
 [LT500D-EMU] LT500D_LAN_IP_GATE=PASS br-lan=192.168.10.2
@@ -42,224 +40,224 @@ https_static=200
 
 ## Serial tail
 ```text
-[   64.271702] firmadyne: sys_setsockopt[PID: 3192 (fw3)]: fd:10, level:41, optname:64
-[   64.273354] firmadyne: sys_setsockopt[PID: 3192 (fw3)]: fd:10, level:41, optname:65
-[   64.274091] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:3, protocol:255
-[   64.274639] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:3, protocol:255
-[   64.275476] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:3, protocol:255
-[   64.279355] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.279728] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.283300] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.283669] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.284144] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.284447] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.284975] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.285277] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.285720] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.286017] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.286573] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.286880] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.289100] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.289447] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.289804] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.290095] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:524289, protocol:17
-[   64.296851] firmadyne: sys_setsockopt[PID: 3192 (fw3)]: fd:13, level:41, optname:64
-[   64.303879] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:3, protocol:255
-[   64.304454] firmadyne: sys_socket[PID: 3192 (fw3)]: family:10, type:3, protocol:255
-[   64.305048] firmadyne: sys_socket[PID: 3192 (fw3)]: family:16, type:524291, protocol:0
-[   64.317360] firmadyne: sys_socket[PID: 3197 (gcom)]: family:1, type:524289, protocol:0
-[   64.341236] firmadyne: sys_socket[PID: 1 (procd)]: family:1, type:524289, protocol:0
-[   64.386093] firmadyne: sys_socket[PID: 3202 (ipset)]: family:16, type:3, protocol:12
-[   64.405423] firmadyne: sys_socket[PID: 3205 (ipset)]: family:16, type:3, protocol:12
-[   64.436043] firmadyne: sys_socket[PID: 3209 (ipset)]: family:16, type:3, protocol:12
-[   64.453263] firmadyne: sys_socket[PID: 3212 (ipset)]: family:16, type:3, protocol:12
-[   64.470822] firmadyne: sys_socket[PID: 3215 (ipset)]: family:16, type:3, protocol:12
-[   64.488329] firmadyne: sys_socket[PID: 3218 (ipset)]: family:16, type:3, protocol:12
-[   64.498542] firmadyne: sys_socket[PID: 3221 (ipset)]: family:16, type:3, protocol:12
-[   64.515606] firmadyne: sys_socket[PID: 3224 (ipset)]: family:16, type:3, protocol:12
-[   64.567731] firmadyne: sys_socket[PID: 3228 (mosquitto)]: family:2, type:2, protocol:0
-[   64.596937] firmadyne: sys_socket[PID: 3229 (iptables)]: family:1, type:2, protocol:0
-[   64.597666] firmadyne: sys_socket[PID: 3229 (iptables)]: family:2, type:3, protocol:255
-[   64.605458] firmadyne: sys_setsockopt[PID: 3229 (iptables)]: fd:1, level:0, optname:64
-[   64.606023] firmadyne: sys_setsockopt[PID: 3229 (iptables)]: fd:1, level:0, optname:65
-[   64.610333] firmadyne: sys_socket[PID: 3228 (mosquitto)]: family:1, type:524290, protocol:0
-[   64.632384] firmadyne: sys_socket[PID: 3228 (mosquitto)]: family:1, type:524289, protocol:0
-[   64.636416] firmadyne: sys_socket[PID: 3230 (iptables)]: family:1, type:2, protocol:0
-[   64.636897] firmadyne: sys_socket[PID: 3230 (iptables)]: family:2, type:3, protocol:255
-[   64.644009] firmadyne: sys_socket[PID: 3228 (mosquitto)]: family:2, type:2, protocol:6
-[   64.644392] firmadyne: sys_setsockopt[PID: 3228 (mosquitto)]: fd:5, level:65535, optname:4
-[   64.644845] firmadyne: sys_setsockopt[PID: 3228 (mosquitto)]: fd:5, level:41, optname:26
-[   64.645367] firmadyne: inet_bind[PID: 3228 (mosquitto)]: proto:SOCK_STREAM, port:1883
-[   64.646806] firmadyne: sys_socket[PID: 3228 (mosquitto)]: family:2, type:2, protocol:6
-[   64.655149] firmadyne: sys_setsockopt[PID: 3228 (mosquitto)]: fd:6, level:65535, optname:4
-[   64.655432] firmadyne: sys_setsockopt[PID: 3228 (mosquitto)]: fd:6, level:41, optname:26
-[   64.655718] firmadyne: inet_bind[PID: 3228 (mosquitto)]: proto:SOCK_STREAM, port:8883
-[   64.690031] firmadyne: sys_socket[PID: 3231 (ip6tables)]: family:1, type:2, protocol:0
-[   64.690511] firmadyne: sys_socket[PID: 3231 (ip6tables)]: family:10, type:3, protocol:255
-[   64.694511] firmadyne: sys_setsockopt[PID: 3231 (ip6tables)]: fd:1, level:41, optname:64
-[   64.695081] firmadyne: sys_setsockopt[PID: 3231 (ip6tables)]: fd:1, level:41, optname:65
-[   64.717199] firmadyne: sys_socket[PID: 3232 (ip6tables)]: family:1, type:2, protocol:0
-[   64.717644] firmadyne: sys_socket[PID: 3232 (ip6tables)]: family:10, type:3, protocol:255
-[   64.742987] firmadyne: sys_socket[PID: 3233 (iptables)]: family:1, type:2, protocol:0
-[   64.743584] firmadyne: sys_socket[PID: 3233 (iptables)]: family:2, type:3, protocol:255
-[   64.746254] firmadyne: sys_setsockopt[PID: 3233 (iptables)]: fd:1, level:0, optname:64
-[   64.746792] firmadyne: sys_setsockopt[PID: 3233 (iptables)]: fd:1, level:0, optname:65
-[   64.766779] firmadyne: sys_socket[PID: 3234 (iptables)]: family:1, type:2, protocol:0
-[   64.767444] firmadyne: sys_socket[PID: 3234 (iptables)]: family:2, type:3, protocol:255
-[   64.770349] firmadyne: sys_setsockopt[PID: 3234 (iptables)]: fd:1, level:0, optname:64
-[   64.770877] firmadyne: sys_setsockopt[PID: 3234 (iptables)]: fd:1, level:0, optname:65
-[   64.791357] firmadyne: sys_socket[PID: 3235 (ip6tables)]: family:1, type:2, protocol:0
-[   64.791804] firmadyne: sys_socket[PID: 3235 (ip6tables)]: family:10, type:3, protocol:255
-[   64.794390] firmadyne: sys_setsockopt[PID: 3235 (ip6tables)]: fd:1, level:41, optname:64
-[   64.794892] firmadyne: sys_setsockopt[PID: 3235 (ip6tables)]: fd:1, level:41, optname:65
-[   64.814817] firmadyne: sys_socket[PID: 3236 (ip6tables)]: family:1, type:2, protocol:0
-[   64.815307] firmadyne: sys_socket[PID: 3236 (ip6tables)]: family:10, type:3, protocol:255
-[   64.817902] firmadyne: sys_setsockopt[PID: 3236 (ip6tables)]: fd:1, level:41, optname:64
-[   64.818375] firmadyne: sys_setsockopt[PID: 3236 (ip6tables)]: fd:1, level:41, optname:65
-[   64.880010] firmadyne: sys_socket[PID: 3239 (iptables)]: family:1, type:2, protocol:0
-[   64.880433] firmadyne: sys_socket[PID: 3239 (iptables)]: family:2, type:3, protocol:255
-[   64.882977] firmadyne: sys_setsockopt[PID: 3239 (iptables)]: fd:1, level:0, optname:64
-[   64.883841] firmadyne: sys_setsockopt[PID: 3239 (iptables)]: fd:1, level:0, optname:65
-[   64.906282] firmadyne: sys_socket[PID: 3240 (iptables)]: family:10, type:524289, protocol:17
-[   64.907324] firmadyne: sys_socket[PID: 3240 (iptables)]: family:10, type:524289, protocol:17
-[   64.910426] firmadyne: sys_socket[PID: 3240 (iptables)]: family:1, type:2, protocol:0
-[   64.910871] firmadyne: sys_socket[PID: 3240 (iptables)]: family:2, type:3, protocol:255
-[   64.914018] firmadyne: sys_setsockopt[PID: 3240 (iptables)]: fd:1, level:0, optname:64
-[   64.914617] firmadyne: sys_setsockopt[PID: 3240 (iptables)]: fd:1, level:0, optname:65
-[   64.946629] firmadyne: sys_socket[PID: 3241 (iptables)]: family:1, type:2, protocol:0
-[   64.947403] firmadyne: sys_socket[PID: 3241 (iptables)]: family:2, type:3, protocol:255
-[   64.950147] firmadyne: sys_setsockopt[PID: 3241 (iptables)]: fd:1, level:0, optname:64
-[   64.950747] firmadyne: sys_setsockopt[PID: 3241 (iptables)]: fd:1, level:0, optname:65
-[   64.974165] firmadyne: sys_socket[PID: 3242 (ip6tables)]: family:1, type:2, protocol:0
-[   64.975784] firmadyne: sys_socket[PID: 3242 (ip6tables)]: family:10, type:3, protocol:255
-[   64.978358] firmadyne: sys_setsockopt[PID: 3242 (ip6tables)]: fd:1, level:41, optname:64
-[   64.978865] firmadyne: sys_setsockopt[PID: 3242 (ip6tables)]: fd:1, level:41, optname:65
-[   64.992507] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   64.992810] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   64.993004] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   64.993192] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   64.993375] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   64.993590] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   65.009183] firmadyne: sys_socket[PID: 3243 (ip6tables)]: family:10, type:524289, protocol:17
-[   65.009889] firmadyne: sys_socket[PID: 3243 (ip6tables)]: family:10, type:524289, protocol:17
-[   65.013500] firmadyne: sys_socket[PID: 3243 (ip6tables)]: family:1, type:2, protocol:0
-[   65.013892] firmadyne: sys_socket[PID: 3243 (ip6tables)]: family:10, type:3, protocol:255
-[   65.016949] firmadyne: sys_setsockopt[PID: 3243 (ip6tables)]: fd:1, level:41, optname:64
-[   65.017517] firmadyne: sys_setsockopt[PID: 3243 (ip6tables)]: fd:1, level:41, optname:65
-[   65.040322] firmadyne: sys_socket[PID: 3244 (ip6tables)]: family:1, type:2, protocol:0
-[   65.040764] firmadyne: sys_socket[PID: 3244 (ip6tables)]: family:10, type:3, protocol:255
-[   65.043689] firmadyne: sys_setsockopt[PID: 3244 (ip6tables)]: fd:1, level:41, optname:64
-[   65.044254] firmadyne: sys_setsockopt[PID: 3244 (ip6tables)]: fd:1, level:41, optname:65
-[   65.088206] firmadyne: sys_socket[PID: 3246 (iptables)]: family:1, type:2, protocol:0
-[   65.088705] firmadyne: sys_socket[PID: 3246 (iptables)]: family:2, type:3, protocol:255
-[   65.092193] firmadyne: sys_setsockopt[PID: 3246 (iptables)]: fd:1, level:0, optname:64
-[   65.092793] firmadyne: sys_setsockopt[PID: 3246 (iptables)]: fd:1, level:0, optname:65
-[   65.114437] firmadyne: sys_socket[PID: 3247 (ip6tables)]: family:1, type:2, protocol:0
-[   65.114880] firmadyne: sys_socket[PID: 3247 (ip6tables)]: family:10, type:3, protocol:255
-[   65.118156] firmadyne: sys_setsockopt[PID: 3247 (ip6tables)]: fd:1, level:41, optname:64
-[   65.118764] firmadyne: sys_setsockopt[PID: 3247 (ip6tables)]: fd:1, level:41, optname:65
-[   65.163505] firmadyne: sys_socket[PID: 3249 (iptables)]: family:1, type:2, protocol:0
-[   65.163982] firmadyne: sys_socket[PID: 3249 (iptables)]: family:2, type:3, protocol:255
-[   65.166553] firmadyne: sys_setsockopt[PID: 3249 (iptables)]: fd:1, level:0, optname:64
-[   65.167318] firmadyne: sys_setsockopt[PID: 3249 (iptables)]: fd:1, level:0, optname:65
-[   65.189778] firmadyne: sys_socket[PID: 3250 (iptables)]: family:1, type:2, protocol:0
-[   65.190219] firmadyne: sys_socket[PID: 3250 (iptables)]: family:2, type:3, protocol:255
-[   65.201312] firmadyne: sys_setsockopt[PID: 3250 (iptables)]: fd:1, level:0, optname:64
-[   65.201859] firmadyne: sys_setsockopt[PID: 3250 (iptables)]: fd:1, level:0, optname:65
-[   65.215315] firmadyne: sys_socket[PID: 3251 (ifconfig)]: family:2, type:1, protocol:0
-[   65.216902] firmadyne: __inet_insert_ifa[PID: 3251 (ifconfig)]: device:eth1 ifa:0x00000000
-[   65.254618] firmadyne: sys_socket[PID: 3252 (iptables)]: family:1, type:2, protocol:0
-[   65.256975] firmadyne: sys_socket[PID: 3253 (brctl)]: family:2, type:2, protocol:0
-[   65.257847] firmadyne: sys_socket[PID: 3253 (brctl)]: family:1, type:524289, protocol:0
-[   65.258673] firmadyne: sys_socket[PID: 3253 (brctl)]: family:1, type:524289, protocol:0
-[   65.259000] firmadyne: sys_socket[PID: 3253 (brctl)]: family:1, type:524289, protocol:0
-[   65.263216] firmadyne: sys_socket[PID: 3252 (iptables)]: family:2, type:3, protocol:255
-[   65.266179] firmadyne: sys_setsockopt[PID: 3252 (iptables)]: fd:1, level:0, optname:64
-[   65.266693] firmadyne: sys_setsockopt[PID: 3252 (iptables)]: fd:1, level:0, optname:65
-[   65.304429] firmadyne: sys_socket[PID: 3256 (iptables)]: family:1, type:2, protocol:0
-[   65.304947] firmadyne: sys_socket[PID: 3256 (iptables)]: family:2, type:3, protocol:255
-[   65.319634] firmadyne: sys_socket[PID: 3255 (iptables)]: family:1, type:2, protocol:0
-[   65.320111] firmadyne: sys_socket[PID: 3255 (iptables)]: family:2, type:3, protocol:255
-[   65.372180] firmadyne: sys_socket[PID: 3258 (iptables)]: family:1, type:2, protocol:0
-[   65.372644] firmadyne: sys_socket[PID: 3258 (iptables)]: family:2, type:3, protocol:255
-[   65.423817] firmadyne: sys_socket[PID: 3259 (iptables)]: family:1, type:2, protocol:0
-[   65.424282] firmadyne: sys_socket[PID: 3259 (iptables)]: family:2, type:3, protocol:255
-[   65.476177] firmadyne: sys_socket[PID: 3260 (iptables)]: family:1, type:2, protocol:0
-[   65.476660] firmadyne: sys_socket[PID: 3260 (iptables)]: family:2, type:3, protocol:255
-[   65.666639] firmadyne: sys_socket[PID: 3268 (iptables)]: family:1, type:2, protocol:0
-[   65.667400] firmadyne: sys_socket[PID: 3268 (iptables)]: family:2, type:3, protocol:255
-[   65.694714] firmadyne: sys_socket[PID: 3269 (iptables)]: family:1, type:2, protocol:0
-[   65.695381] firmadyne: sys_socket[PID: 3269 (iptables)]: family:2, type:3, protocol:255
-[   65.697807] firmadyne: sys_setsockopt[PID: 3269 (iptables)]: fd:1, level:0, optname:64
-[   65.724836] firmadyne: sys_socket[PID: 3272 (iptables)]: family:1, type:2, protocol:0
-[   65.725315] firmadyne: sys_socket[PID: 3272 (iptables)]: family:2, type:3, protocol:255
-[   65.745707] firmadyne: sys_socket[PID: 3273 (iptables)]: family:1, type:2, protocol:0
-[   65.746149] firmadyne: sys_socket[PID: 3273 (iptables)]: family:2, type:3, protocol:255
-[   65.773313] firmadyne: sys_socket[PID: 3274 (iptables)]: family:1, type:2, protocol:0
-[   65.773796] firmadyne: sys_socket[PID: 3274 (iptables)]: family:2, type:3, protocol:255
-[   65.940760] firmadyne: sys_socket[PID: 3283 (iptables)]: family:1, type:2, protocol:0
-[   65.941277] firmadyne: sys_socket[PID: 3283 (iptables)]: family:2, type:3, protocol:255
-[   65.957640] firmadyne: sys_socket[PID: 3284 (iptables)]: family:1, type:2, protocol:0
-[   65.958091] firmadyne: sys_socket[PID: 3284 (iptables)]: family:2, type:3, protocol:255
-[   65.980014] firmadyne: sys_socket[PID: 3285 (iptables)]: family:1, type:2, protocol:0
-[   65.980465] firmadyne: sys_socket[PID: 3285 (iptables)]: family:2, type:3, protocol:255
-[   66.002430] firmadyne: sys_socket[PID: 3286 (iptables)]: family:1, type:2, protocol:0
-[   66.002919] firmadyne: sys_socket[PID: 3286 (iptables)]: family:2, type:3, protocol:255
-[   66.017777] firmadyne: sys_socket[PID: 3287 (iptables)]: family:1, type:2, protocol:0
-[   66.018220] firmadyne: sys_socket[PID: 3287 (iptables)]: family:2, type:3, protocol:255
-[   66.040113] firmadyne: sys_socket[PID: 3288 (iptables)]: family:1, type:2, protocol:0
-[   66.040594] firmadyne: sys_socket[PID: 3288 (iptables)]: family:2, type:3, protocol:255
-[   66.151926] firmadyne: sys_socket[PID: 3293 (ubus)]: family:1, type:2, protocol:0
-[   66.228319] firmadyne: sys_socket[PID: 3296 (logger)]: family:1, type:524289, protocol:0
-[   66.251561] firmadyne: sys_socket[PID: 3297 (iptables)]: family:1, type:2, protocol:0
-[   66.252011] firmadyne: sys_socket[PID: 3297 (iptables)]: family:2, type:3, protocol:255
-[   66.265912] firmadyne: sys_socket[PID: 3298 (iptables)]: family:1, type:2, protocol:0
-[   66.266383] firmadyne: sys_socket[PID: 3298 (iptables)]: family:2, type:3, protocol:255
-[   66.287321] firmadyne: sys_socket[PID: 3299 (iptables)]: family:1, type:2, protocol:0
-[   66.287789] firmadyne: sys_socket[PID: 3299 (iptables)]: family:2, type:3, protocol:255
-[   66.305394] firmadyne: sys_socket[PID: 3300 (ip)]: family:16, type:524291, protocol:0
-[   66.305783] firmadyne: sys_setsockopt[PID: 3300 (ip)]: fd:0, level:65535, optname:4097
-[   66.306108] firmadyne: sys_setsockopt[PID: 3300 (ip)]: fd:0, level:65535, optname:4098
-[   66.328731] firmadyne: sys_socket[PID: 3301 (ipset)]: family:16, type:3, protocol:12
-[   66.346074] firmadyne: sys_socket[PID: 3304 (ipset)]: family:16, type:3, protocol:12
-[   66.363775] firmadyne: sys_socket[PID: 3307 (ipset)]: family:16, type:3, protocol:12
-[   66.381017] firmadyne: sys_socket[PID: 3310 (ipset)]: family:16, type:3, protocol:12
-[   66.398446] firmadyne: sys_socket[PID: 3313 (ipset)]: family:16, type:3, protocol:12
-[   66.415742] firmadyne: sys_socket[PID: 3316 (ipset)]: family:16, type:3, protocol:12
-[   66.458394] firmadyne: sys_socket[PID: 3320 (ipset)]: family:16, type:3, protocol:12
-[   66.476037] firmadyne: sys_socket[PID: 3323 (ipset)]: family:16, type:3, protocol:12
-[   66.607459] firmadyne: sys_socket[PID: 3331 (iptables)]: family:1, type:2, protocol:0
-[   66.607959] firmadyne: sys_socket[PID: 3331 (iptables)]: family:2, type:3, protocol:255
-[   66.629874] firmadyne: sys_socket[PID: 3332 (iptables)]: family:1, type:2, protocol:0
-[   66.630340] firmadyne: sys_socket[PID: 3332 (iptables)]: family:2, type:3, protocol:255
-[   66.632069] firmadyne: sys_socket[PID: 3332 (iptables)]: family:2, type:3, protocol:255
-[   66.652520] firmadyne: sys_socket[PID: 3337 (iptables)]: family:1, type:2, protocol:0
-[   66.653050] firmadyne: sys_socket[PID: 3337 (iptables)]: family:2, type:3, protocol:255
-[   66.654140] firmadyne: sys_socket[PID: 3337 (iptables)]: family:2, type:3, protocol:255
-[   66.674915] firmadyne: sys_socket[PID: 3342 (ip6tables)]: family:1, type:2, protocol:0
-[   66.675402] firmadyne: sys_socket[PID: 3342 (ip6tables)]: family:10, type:3, protocol:255
-[   66.749200] firmadyne: sys_socket[PID: 3346 (iptables)]: family:1, type:2, protocol:0
-[   66.749703] firmadyne: sys_socket[PID: 3346 (iptables)]: family:2, type:3, protocol:255
-[   66.775753] firmadyne: sys_socket[PID: 3348 (iptables)]: family:1, type:2, protocol:0
-[   66.776231] firmadyne: sys_socket[PID: 3348 (iptables)]: family:2, type:3, protocol:255
-[   66.799660] firmadyne: sys_socket[PID: 3349 (iptables)]: family:1, type:2, protocol:0
-[   66.800126] firmadyne: sys_socket[PID: 3349 (iptables)]: family:2, type:3, protocol:255
-[   66.801262] firmadyne: sys_socket[PID: 3349 (iptables)]: family:2, type:3, protocol:255
-[   66.834047] firmadyne: sys_socket[PID: 3355 (iptables)]: family:1, type:2, protocol:0
-[   66.834507] firmadyne: sys_socket[PID: 3355 (iptables)]: family:2, type:3, protocol:255
-[   66.835878] firmadyne: sys_socket[PID: 3355 (iptables)]: family:2, type:3, protocol:255
-[   66.858577] firmadyne: sys_socket[PID: 3361 (iptables)]: family:1, type:2, protocol:0
-[   66.859042] firmadyne: sys_socket[PID: 3361 (iptables)]: family:2, type:3, protocol:255
-[   66.860373] firmadyne: sys_socket[PID: 3361 (iptables)]: family:2, type:3, protocol:255
-[   66.884782] firmadyne: sys_socket[PID: 3367 (ip6tables)]: family:1, type:2, protocol:0
-[   66.885200] firmadyne: sys_socket[PID: 3367 (ip6tables)]: family:10, type:3, protocol:255
-[   66.909216] firmadyne: sys_socket[PID: 3369 (ip6tables)]: family:1, type:2, protocol:0
-[   66.909660] firmadyne: sys_socket[PID: 3369 (ip6tables)]: family:10, type:3, protocol:255
-[   66.915700] firmadyne: sys_socket[PID: 3192 (fw3)]: family:16, type:524291, protocol:0
-[   67.013225] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   67.013593] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   67.013799] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   67.013988] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   67.014176] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
-[   67.014362] firmadyne: inet_accept[PID: 2339 (uhttpd)]:
+[   66.492934] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.493575] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.493889] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.494972] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.495780] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.496229] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.496560] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.501558] firmadyne: sys_setsockopt[PID: 3136 (fw3)]: fd:7, level:0, optname:64
+[   66.504548] firmadyne: sys_socket[PID: 3136 (fw3)]: family:2, type:3, protocol:255
+[   66.505238] firmadyne: sys_socket[PID: 3136 (fw3)]: family:2, type:3, protocol:255
+[   66.505980] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:3, protocol:255
+[   66.512437] firmadyne: sys_setsockopt[PID: 3136 (fw3)]: fd:10, level:41, optname:64
+[   66.514122] firmadyne: sys_setsockopt[PID: 3136 (fw3)]: fd:10, level:41, optname:65
+[   66.514896] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:3, protocol:255
+[   66.515809] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:3, protocol:255
+[   66.516359] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:3, protocol:255
+[   66.520136] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.520535] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.523926] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.524312] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.524753] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.525061] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.525587] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.525890] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.526336] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.526644] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.527669] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.528015] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.528768] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.529111] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.529466] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.529765] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:524289, protocol:17
+[   66.532762] firmadyne: sys_setsockopt[PID: 3136 (fw3)]: fd:13, level:41, optname:64
+[   66.534081] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:3, protocol:255
+[   66.534691] firmadyne: sys_socket[PID: 3136 (fw3)]: family:10, type:3, protocol:255
+[   66.535607] firmadyne: sys_socket[PID: 3136 (fw3)]: family:16, type:524291, protocol:0
+[   66.544134] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   66.544548] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   66.544759] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   66.620755] firmadyne: sys_socket[PID: 3150 (ipset)]: family:16, type:3, protocol:12
+[   66.641153] firmadyne: sys_socket[PID: 3153 (ipset)]: family:16, type:3, protocol:12
+[   66.673214] firmadyne: sys_socket[PID: 3157 (ipset)]: family:16, type:3, protocol:12
+[   66.691534] firmadyne: sys_socket[PID: 3160 (ipset)]: family:16, type:3, protocol:12
+[   66.710024] firmadyne: sys_socket[PID: 3163 (ipset)]: family:16, type:3, protocol:12
+[   66.729150] firmadyne: sys_socket[PID: 3166 (ipset)]: family:16, type:3, protocol:12
+[   66.748083] firmadyne: sys_socket[PID: 3169 (ipset)]: family:16, type:3, protocol:12
+[   66.766536] firmadyne: sys_socket[PID: 3172 (ipset)]: family:16, type:3, protocol:12
+[   66.822197] firmadyne: sys_socket[PID: 3176 (iptables)]: family:1, type:2, protocol:0
+[   66.823825] firmadyne: sys_socket[PID: 3176 (iptables)]: family:2, type:3, protocol:255
+[   66.829236] firmadyne: sys_setsockopt[PID: 3176 (iptables)]: fd:1, level:0, optname:64
+[   66.829824] firmadyne: sys_setsockopt[PID: 3176 (iptables)]: fd:1, level:0, optname:65
+[   66.862742] firmadyne: sys_socket[PID: 3177 (iptables)]: family:1, type:2, protocol:0
+[   66.863581] firmadyne: sys_socket[PID: 3177 (iptables)]: family:2, type:3, protocol:255
+[   66.890996] firmadyne: sys_socket[PID: 3178 (ip6tables)]: family:1, type:2, protocol:0
+[   66.891632] firmadyne: sys_socket[PID: 3178 (ip6tables)]: family:10, type:3, protocol:255
+[   66.895644] firmadyne: sys_setsockopt[PID: 3178 (ip6tables)]: fd:1, level:41, optname:64
+[   66.896206] firmadyne: sys_setsockopt[PID: 3178 (ip6tables)]: fd:1, level:41, optname:65
+[   66.918824] firmadyne: sys_socket[PID: 3179 (ip6tables)]: family:1, type:2, protocol:0
+[   66.919363] firmadyne: sys_socket[PID: 3179 (ip6tables)]: family:10, type:3, protocol:255
+[   66.942327] firmadyne: sys_socket[PID: 3180 (iptables)]: family:1, type:2, protocol:0
+[   66.942828] firmadyne: sys_socket[PID: 3180 (iptables)]: family:2, type:3, protocol:255
+[   66.945875] firmadyne: sys_setsockopt[PID: 3180 (iptables)]: fd:1, level:0, optname:64
+[   66.946426] firmadyne: sys_setsockopt[PID: 3180 (iptables)]: fd:1, level:0, optname:65
+[   66.967634] firmadyne: sys_socket[PID: 3181 (iptables)]: family:1, type:2, protocol:0
+[   66.968110] firmadyne: sys_socket[PID: 3181 (iptables)]: family:2, type:3, protocol:255
+[   66.970998] firmadyne: sys_setsockopt[PID: 3181 (iptables)]: fd:1, level:0, optname:64
+[   66.971913] firmadyne: sys_setsockopt[PID: 3181 (iptables)]: fd:1, level:0, optname:65
+[   66.992131] firmadyne: sys_socket[PID: 3182 (ip6tables)]: family:1, type:2, protocol:0
+[   66.992616] firmadyne: sys_socket[PID: 3182 (ip6tables)]: family:10, type:3, protocol:255
+[   66.999411] firmadyne: sys_setsockopt[PID: 3182 (ip6tables)]: fd:1, level:41, optname:64
+[   66.999904] firmadyne: sys_setsockopt[PID: 3182 (ip6tables)]: fd:1, level:41, optname:65
+[   67.015965] firmadyne: sys_socket[PID: 3184 (ifconfig)]: family:2, type:1, protocol:0
+[   67.017494] firmadyne: __inet_insert_ifa[PID: 3184 (ifconfig)]: device:eth1 ifa:0x00000000
+[   67.045142] firmadyne: sys_socket[PID: 3183 (ip6tables)]: family:1, type:2, protocol:0
+[   67.045625] firmadyne: sys_socket[PID: 3183 (ip6tables)]: family:10, type:3, protocol:255
+[   67.056335] firmadyne: sys_setsockopt[PID: 3183 (ip6tables)]: fd:1, level:41, optname:64
+[   67.056836] firmadyne: sys_setsockopt[PID: 3183 (ip6tables)]: fd:1, level:41, optname:65
+[   67.067153] firmadyne: sys_socket[PID: 3185 (brctl)]: family:2, type:2, protocol:0
+[   67.068123] firmadyne: sys_socket[PID: 3185 (brctl)]: family:1, type:524289, protocol:0
+[   67.068976] firmadyne: sys_socket[PID: 3185 (brctl)]: family:1, type:524289, protocol:0
+[   67.069343] firmadyne: sys_socket[PID: 3185 (brctl)]: family:1, type:524289, protocol:0
+[   67.118571] firmadyne: sys_socket[PID: 3188 (iptables)]: family:1, type:2, protocol:0
+[   67.127121] firmadyne: sys_socket[PID: 3188 (iptables)]: family:2, type:3, protocol:255
+[   67.179469] firmadyne: sys_socket[PID: 3190 (iptables)]: family:1, type:2, protocol:0
+[   67.179977] firmadyne: sys_socket[PID: 3190 (iptables)]: family:2, type:3, protocol:255
+[   67.204874] firmadyne: sys_socket[PID: 3191 (iptables)]: family:1, type:2, protocol:0
+[   67.205429] firmadyne: sys_socket[PID: 3191 (iptables)]: family:2, type:3, protocol:255
+[   67.212314] firmadyne: sys_setsockopt[PID: 3191 (iptables)]: fd:1, level:0, optname:64
+[   67.212861] firmadyne: sys_setsockopt[PID: 3191 (iptables)]: fd:1, level:0, optname:65
+[   67.232678] firmadyne: sys_socket[PID: 3192 (iptables)]: family:1, type:2, protocol:0
+[   67.233180] firmadyne: sys_socket[PID: 3192 (iptables)]: family:2, type:3, protocol:255
+[   67.254614] firmadyne: sys_socket[PID: 3193 (iptables)]: family:10, type:524289, protocol:17
+[   67.259410] firmadyne: sys_socket[PID: 3193 (iptables)]: family:10, type:524289, protocol:17
+[   67.262401] firmadyne: sys_socket[PID: 3193 (iptables)]: family:1, type:2, protocol:0
+[   67.262882] firmadyne: sys_socket[PID: 3193 (iptables)]: family:2, type:3, protocol:255
+[   67.273605] firmadyne: sys_setsockopt[PID: 3193 (iptables)]: fd:1, level:0, optname:64
+[   67.274232] firmadyne: sys_setsockopt[PID: 3193 (iptables)]: fd:1, level:0, optname:65
+[   67.288763] firmadyne: sys_socket[PID: 3194 (iptables)]: family:1, type:2, protocol:0
+[   67.289280] firmadyne: sys_socket[PID: 3194 (iptables)]: family:2, type:3, protocol:255
+[   67.322812] firmadyne: sys_socket[PID: 3195 (iptables)]: family:1, type:2, protocol:0
+[   67.323832] firmadyne: sys_socket[PID: 3195 (iptables)]: family:2, type:3, protocol:255
+[   67.326655] firmadyne: sys_setsockopt[PID: 3195 (iptables)]: fd:1, level:0, optname:64
+[   67.327625] firmadyne: sys_setsockopt[PID: 3195 (iptables)]: fd:1, level:0, optname:65
+[   67.348983] firmadyne: sys_socket[PID: 3197 (ip6tables)]: family:1, type:2, protocol:0
+[   67.349495] firmadyne: sys_socket[PID: 3197 (ip6tables)]: family:10, type:3, protocol:255
+[   67.352405] firmadyne: sys_setsockopt[PID: 3197 (ip6tables)]: fd:1, level:41, optname:64
+[   67.352911] firmadyne: sys_setsockopt[PID: 3197 (ip6tables)]: fd:1, level:41, optname:65
+[   67.379812] firmadyne: sys_socket[PID: 3198 (ip6tables)]: family:10, type:524289, protocol:17
+[   67.380636] firmadyne: sys_socket[PID: 3198 (ip6tables)]: family:10, type:524289, protocol:17
+[   67.384137] firmadyne: sys_socket[PID: 3198 (ip6tables)]: family:1, type:2, protocol:0
+[   67.384577] firmadyne: sys_socket[PID: 3198 (ip6tables)]: family:10, type:3, protocol:255
+[   67.387730] firmadyne: sys_setsockopt[PID: 3198 (ip6tables)]: fd:1, level:41, optname:64
+[   67.388335] firmadyne: sys_setsockopt[PID: 3198 (ip6tables)]: fd:1, level:41, optname:65
+[   67.412620] firmadyne: sys_socket[PID: 3199 (ip6tables)]: family:1, type:2, protocol:0
+[   67.413106] firmadyne: sys_socket[PID: 3199 (ip6tables)]: family:10, type:3, protocol:255
+[   67.416220] firmadyne: sys_setsockopt[PID: 3199 (ip6tables)]: fd:1, level:41, optname:64
+[   67.416835] firmadyne: sys_setsockopt[PID: 3199 (ip6tables)]: fd:1, level:41, optname:65
+[   67.462653] firmadyne: sys_socket[PID: 3201 (iptables)]: family:1, type:2, protocol:0
+[   67.463458] firmadyne: sys_socket[PID: 3201 (iptables)]: family:2, type:3, protocol:255
+[   67.466472] firmadyne: sys_setsockopt[PID: 3201 (iptables)]: fd:1, level:0, optname:64
+[   67.467335] firmadyne: sys_setsockopt[PID: 3201 (iptables)]: fd:1, level:0, optname:65
+[   67.489806] firmadyne: sys_socket[PID: 3202 (ip6tables)]: family:1, type:2, protocol:0
+[   67.490302] firmadyne: sys_socket[PID: 3202 (ip6tables)]: family:10, type:3, protocol:255
+[   67.493694] firmadyne: sys_setsockopt[PID: 3202 (ip6tables)]: fd:1, level:41, optname:64
+[   67.494320] firmadyne: sys_setsockopt[PID: 3202 (ip6tables)]: fd:1, level:41, optname:65
+[   67.539106] firmadyne: sys_socket[PID: 3204 (iptables)]: family:1, type:2, protocol:0
+[   67.539721] firmadyne: sys_socket[PID: 3204 (iptables)]: family:2, type:3, protocol:255
+[   67.542389] firmadyne: sys_setsockopt[PID: 3204 (iptables)]: fd:1, level:0, optname:64
+[   67.542930] firmadyne: sys_setsockopt[PID: 3204 (iptables)]: fd:1, level:0, optname:65
+[   67.563713] firmadyne: sys_socket[PID: 3205 (iptables)]: family:1, type:2, protocol:0
+[   67.564179] firmadyne: sys_socket[PID: 3205 (iptables)]: family:2, type:3, protocol:255
+[   67.567886] firmadyne: sys_setsockopt[PID: 3205 (iptables)]: fd:1, level:0, optname:64
+[   67.568436] firmadyne: sys_setsockopt[PID: 3205 (iptables)]: fd:1, level:0, optname:65
+[   67.589161] firmadyne: sys_socket[PID: 3206 (iptables)]: family:1, type:2, protocol:0
+[   67.589675] firmadyne: sys_socket[PID: 3206 (iptables)]: family:2, type:3, protocol:255
+[   67.592996] firmadyne: sys_setsockopt[PID: 3206 (iptables)]: fd:1, level:0, optname:64
+[   67.593565] firmadyne: sys_setsockopt[PID: 3206 (iptables)]: fd:1, level:0, optname:65
+[   67.618254] firmadyne: sys_socket[PID: 3207 (iptables)]: family:1, type:2, protocol:0
+[   67.618766] firmadyne: sys_socket[PID: 3207 (iptables)]: family:2, type:3, protocol:255
+[   67.872740] firmadyne: sys_socket[PID: 3215 (iptables)]: family:1, type:2, protocol:0
+[   67.873245] firmadyne: sys_socket[PID: 3215 (iptables)]: family:2, type:3, protocol:255
+[   67.900919] firmadyne: sys_socket[PID: 3216 (iptables)]: family:1, type:2, protocol:0
+[   67.901424] firmadyne: sys_socket[PID: 3216 (iptables)]: family:2, type:3, protocol:255
+[   67.904214] firmadyne: sys_setsockopt[PID: 3216 (iptables)]: fd:1, level:0, optname:64
+[   67.930685] firmadyne: sys_socket[PID: 3219 (iptables)]: family:1, type:2, protocol:0
+[   67.931406] firmadyne: sys_socket[PID: 3219 (iptables)]: family:2, type:3, protocol:255
+[   67.959499] firmadyne: sys_socket[PID: 3220 (iptables)]: family:1, type:2, protocol:0
+[   67.959978] firmadyne: sys_socket[PID: 3220 (iptables)]: family:2, type:3, protocol:255
+[   67.988278] firmadyne: sys_socket[PID: 3221 (iptables)]: family:1, type:2, protocol:0
+[   67.988779] firmadyne: sys_socket[PID: 3221 (iptables)]: family:2, type:3, protocol:255
+[   68.019580] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   68.019917] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   68.020118] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   68.020340] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   68.768948] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   68.769304] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   68.769507] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   68.899332] firmadyne: sys_socket[PID: 3231 (iptables)]: family:1, type:2, protocol:0
+[   68.899904] firmadyne: sys_socket[PID: 3231 (iptables)]: family:2, type:3, protocol:255
+[   68.925315] firmadyne: sys_socket[PID: 3232 (iptables)]: family:1, type:2, protocol:0
+[   68.925813] firmadyne: sys_socket[PID: 3232 (iptables)]: family:2, type:3, protocol:255
+[   68.949112] firmadyne: sys_socket[PID: 3233 (iptables)]: family:1, type:2, protocol:0
+[   68.949653] firmadyne: sys_socket[PID: 3233 (iptables)]: family:2, type:3, protocol:255
+[   68.973300] firmadyne: sys_socket[PID: 3234 (iptables)]: family:1, type:2, protocol:0
+[   68.973785] firmadyne: sys_socket[PID: 3234 (iptables)]: family:2, type:3, protocol:255
+[   68.996214] firmadyne: sys_socket[PID: 3235 (iptables)]: family:1, type:2, protocol:0
+[   68.996738] firmadyne: sys_socket[PID: 3235 (iptables)]: family:2, type:3, protocol:255
+[   69.019991] firmadyne: sys_socket[PID: 3236 (iptables)]: family:1, type:2, protocol:0
+[   69.020487] firmadyne: sys_socket[PID: 3236 (iptables)]: family:2, type:3, protocol:255
+[   69.134507] firmadyne: sys_socket[PID: 3241 (ubus)]: family:1, type:2, protocol:0
+[   69.214992] firmadyne: sys_socket[PID: 3244 (logger)]: family:1, type:524289, protocol:0
+[   69.240179] firmadyne: sys_socket[PID: 3245 (iptables)]: family:1, type:2, protocol:0
+[   69.240716] firmadyne: sys_socket[PID: 3245 (iptables)]: family:2, type:3, protocol:255
+[   69.263734] firmadyne: sys_socket[PID: 3246 (iptables)]: family:1, type:2, protocol:0
+[   69.264283] firmadyne: sys_socket[PID: 3246 (iptables)]: family:2, type:3, protocol:255
+[   69.268532] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   69.268814] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   69.269012] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   69.269225] firmadyne: inet_accept[PID: 2487 (uhttpd)]:
+[   69.292133] firmadyne: sys_socket[PID: 3247 (iptables)]: family:1, type:2, protocol:0
+[   69.292701] firmadyne: sys_socket[PID: 3247 (iptables)]: family:2, type:3, protocol:255
+[   69.311797] firmadyne: sys_socket[PID: 3248 (ip)]: family:16, type:524291, protocol:0
+[   69.312253] firmadyne: sys_setsockopt[PID: 3248 (ip)]: fd:0, level:65535, optname:4097
+[   69.312607] firmadyne: sys_setsockopt[PID: 3248 (ip)]: fd:0, level:65535, optname:4098
+[   69.335701] firmadyne: sys_socket[PID: 3249 (ipset)]: family:16, type:3, protocol:12
+[   69.354173] firmadyne: sys_socket[PID: 3252 (ipset)]: family:16, type:3, protocol:12
+[   69.377254] firmadyne: sys_socket[PID: 3255 (ipset)]: family:16, type:3, protocol:12
+[   69.395716] firmadyne: sys_socket[PID: 3258 (ipset)]: family:16, type:3, protocol:12
+[   69.414115] firmadyne: sys_socket[PID: 3261 (ipset)]: family:16, type:3, protocol:12
+[   69.432951] firmadyne: sys_socket[PID: 3264 (ipset)]: family:16, type:3, protocol:12
+[   69.478080] firmadyne: sys_socket[PID: 3268 (ipset)]: family:16, type:3, protocol:12
+[   69.496474] firmadyne: sys_socket[PID: 3271 (ipset)]: family:16, type:3, protocol:12
+[   69.646558] firmadyne: sys_socket[PID: 3279 (iptables)]: family:1, type:2, protocol:0
+[   69.647113] firmadyne: sys_socket[PID: 3279 (iptables)]: family:2, type:3, protocol:255
+[   69.669630] firmadyne: sys_socket[PID: 3280 (iptables)]: family:1, type:2, protocol:0
+[   69.670110] firmadyne: sys_socket[PID: 3280 (iptables)]: family:2, type:3, protocol:255
+[   69.671769] firmadyne: sys_socket[PID: 3280 (iptables)]: family:2, type:3, protocol:255
+[   69.685386] firmadyne: sys_socket[PID: 3285 (iptables)]: family:1, type:2, protocol:0
+[   69.685853] firmadyne: sys_socket[PID: 3285 (iptables)]: family:2, type:3, protocol:255
+[   69.687126] firmadyne: sys_socket[PID: 3285 (iptables)]: family:2, type:3, protocol:255
+[   69.707996] firmadyne: sys_socket[PID: 3290 (ip6tables)]: family:1, type:2, protocol:0
+[   69.708463] firmadyne: sys_socket[PID: 3290 (ip6tables)]: family:10, type:3, protocol:255
+[   69.801378] firmadyne: sys_socket[PID: 3294 (iptables)]: family:1, type:2, protocol:0
+[   69.801917] firmadyne: sys_socket[PID: 3294 (iptables)]: family:2, type:3, protocol:255
+[   69.827929] firmadyne: sys_socket[PID: 3296 (iptables)]: family:1, type:2, protocol:0
+[   69.828458] firmadyne: sys_socket[PID: 3296 (iptables)]: family:2, type:3, protocol:255
+[   69.852856] firmadyne: sys_socket[PID: 3297 (iptables)]: family:1, type:2, protocol:0
+[   69.853408] firmadyne: sys_socket[PID: 3297 (iptables)]: family:2, type:3, protocol:255
+[   69.854672] firmadyne: sys_socket[PID: 3297 (iptables)]: family:2, type:3, protocol:255
+[   69.896029] firmadyne: sys_socket[PID: 3303 (iptables)]: family:1, type:2, protocol:0
+[   69.896556] firmadyne: sys_socket[PID: 3303 (iptables)]: family:2, type:3, protocol:255
+[   69.897848] firmadyne: sys_socket[PID: 3303 (iptables)]: family:2, type:3, protocol:255
+[   69.922054] firmadyne: sys_socket[PID: 3309 (iptables)]: family:1, type:2, protocol:0
+[   69.922588] firmadyne: sys_socket[PID: 3309 (iptables)]: family:2, type:3, protocol:255
+[   69.924076] firmadyne: sys_socket[PID: 3309 (iptables)]: family:2, type:3, protocol:255
+[   69.964725] firmadyne: sys_socket[PID: 3315 (ip6tables)]: family:1, type:2, protocol:0
+[   69.965223] firmadyne: sys_socket[PID: 3315 (ip6tables)]: family:10, type:3, protocol:255
+[   69.992126] firmadyne: sys_socket[PID: 3317 (ip6tables)]: family:1, type:2, protocol:0
+[   69.992613] firmadyne: sys_socket[PID: 3317 (ip6tables)]: family:10, type:3, protocol:255
+[   69.998779] firmadyne: sys_socket[PID: 3136 (fw3)]: family:16, type:524291, protocol:0
 ```
