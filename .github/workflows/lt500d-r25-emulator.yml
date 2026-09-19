@@ -123,20 +123,29 @@ jobs:
                 printf 'hop=%s scheme=%s path=%s status=%s\n' "$hop" "$current_scheme" "$current_path" "$status" >> /tmp/lt500d-r25-luci-attempts.txt
                 echo "LuCI local hop $hop $current_scheme://cudy.net$current_path -> $status"
 
-                if [ "$status" = 200 ]; then
+                if [ "$status" = 200 ] || [ "$status" = 403 ]; then
+                  donor_html=0
                   if [ -s "/tmp/lt500d-r25-luci${safe}.bin" ] &&
-                     grep -Eqi '<html|<!DOCTYPE|Cudy|sysauth|login|Dashboard|Quick Setup' "/tmp/lt500d-r25-luci${safe}.bin"; then
+                     grep -Eqi '<html|<!DOCTYPE' "/tmp/lt500d-r25-luci${safe}.bin" &&
+                     grep -Eqi '/luci-static/light/|Cudy|sysauth|Quick Setup|setup\.css' "/tmp/lt500d-r25-luci${safe}.bin"; then
+                    donor_html=1
+                  fi
+                  if [ "$donor_html" -eq 1 ]; then
                     luci_ok=1
                     cp "/tmp/lt500d-r25-luci${safe}.headers" /tmp/lt500d-r25-luci.bin.headers
                     cp "/tmp/lt500d-r25-luci${safe}.bin" /tmp/lt500d-r25-luci.bin
                     printf '%s' "$status" > /tmp/lt500d-r25-luci.status
                     printf '%s://cudy.net%s' "$current_scheme" "$current_path" > /tmp/lt500d-r25-luci.resolved-path
-                    echo "LT500D_LUCI_CGI_GATE=PASS final_status=$status path=$current_scheme://cudy.net$current_path"
+                    if [ "$status" = 403 ]; then
+                      echo "LT500D_LUCI_AUTH_GATE=PASS auth_required status=403 path=$current_scheme://cudy.net$current_path"
+                    else
+                      echo "LT500D_LUCI_CGI_GATE=PASS final_status=200 path=$current_scheme://cudy.net$current_path"
+                    fi
                     head -n 12 /tmp/lt500d-r25-luci.bin.headers || true
                     wc -c /tmp/lt500d-r25-luci.bin
                     break
                   fi
-                  echo "LuCI 200 body was not recognizable donor HTML"
+                  echo "LuCI status=$status body was not recognizable donor Cudy/LEDE HTML"
                   head -c 900 "/tmp/lt500d-r25-luci${safe}.bin" 2>/dev/null || true
                   echo
                   break
@@ -215,7 +224,7 @@ jobs:
             exit 1
           fi
           if [ "$luci_ok" -ne 1 ]; then
-            echo "FAIL: donor LuCI CGI did not return an allowed non-error status with recognizable HTML"
+            echo "FAIL: donor LuCI CGI did not return recognizable local Cudy/LEDE HTML"
             exit 1
           fi
           if [ "$https_ok" -ne 1 ]; then
