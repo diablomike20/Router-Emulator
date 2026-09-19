@@ -236,6 +236,10 @@ jobs:
             exit 1
           fi
 
+          echo "Running repository host smoke gate against the same live QEMU"
+          bash scripts/smoke.lt500d-r25-http.sh /tmp/lt500d-r25-local-smoke
+          echo "LT500D_LOCAL_SMOKE_GATE=PASS"
+
           echo "LT500D_HTTP_GATE=PASS"
           echo "LT500D_HTTPS_GATE=PASS"
           echo "LT500D_EMULATOR_GATE=PASS"
