@@ -20,7 +20,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 libdigest-sha-perl sshpass netcat-openbsd
+          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 libdigest-sha-perl sshpass netcat-openbsd liblzo2-dev liblzma-dev libzstd-dev
 
       - name: Download verified stock R25 firmware
         run: |
