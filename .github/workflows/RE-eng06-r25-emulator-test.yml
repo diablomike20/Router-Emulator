@@ -53,7 +53,7 @@ jobs:
           sudo rm -f /tmp/R25-ENG06-rootfs.squashfs
           git clone --depth 1 https://github.com/plougher/squashfs-tools.git /tmp/squashfs-tools
           make -C /tmp/squashfs-tools/squashfs-tools LZMA_XZ_SUPPORT=1 XZ_SUPPORT=1 mksquashfs
-          sudo /tmp/squashfs-tools/squashfs-tools/mksquashfs /tmp/eng06-rootfs /tmp/R25-ENG06-rootfs.squashfs -nopad -noappend -root-owned -comp xz -Xdict-size 100% -b 262144 -processors 1 -no-xattrs -no-progress
+          sudo /tmp/squashfs-tools/squashfs-tools/mksquashfs /tmp/eng06-rootfs /tmp/R25-ENG06-rootfs.squashfs -nopad -noappend -root-owned -comp xz -Xdict-size 100% -b 262144 -processors 1 -no-xattrs -always-use-fragments -no-progress
           sudo chmod 0644 /tmp/R25-ENG06-rootfs.squashfs
           rm -rf /tmp/eng06-reextract
           sudo unsquashfs -d /tmp/eng06-reextract /tmp/R25-ENG06-rootfs.squashfs >/tmp/eng06-reextract.log
@@ -65,9 +65,8 @@ jobs:
           stock=bytearray(Path('/tmp/R25-stock.bin').read_bytes())
           sq=Path('/tmp/R25-ENG06-rootfs.squashfs').read_bytes()
           roff=0x2a7d4d
-          # Emulator-only repack may use the stock zero-padding up to the fwtool metadata at 0xb90000.
-          # This does not change the physical-router firmware layout/checkpoint; it only lets QEMU exercise the patched rootfs.
-          limit=0xb90000
+          # Physical-router safety: rebuilt SquashFS must stop before the stock 0xb60000 deadc0de eraseblock marker.
+          limit=0xb60000
           if len(sq) > limit-roff:
               raise SystemExit(f'rebuilt SquashFS too large: {len(sq)} > {limit-roff}')
           # Preserve stock post-SquashFS eraseblock padding/JFFS2 EOF markers.
