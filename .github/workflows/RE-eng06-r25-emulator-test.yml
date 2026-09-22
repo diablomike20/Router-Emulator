@@ -80,7 +80,13 @@ jobs:
           trailer=sysup.rfind(b'FWx0')
           if meta < 0 or trailer < 0 or len(sysup)-trailer != 16 or meta >= trailer:
               raise SystemExit('fwtool metadata/trailer not found')
-          info=b'{"supported_devices":["cudy,lt500-v2","R25"],"version":{"dist":"LEDE","version":"17.01.5","revision":"2.4.16","board":"ramips"}}\n'
+          # Keep the stock fwtool metadata payload length exactly 127 bytes so the complete
+          # full-flash image remains byte-for-byte the stock size/layout.  Both device IDs are
+          # advertised; non-essential board text is omitted and the JSON is whitespace-padded.
+          info=b'{"supported_devices":["cudy,lt500-v2","R25"],"version":{"dist":"LEDE","version":"17.01.5","revision":"2.4.16"}}'
+          info=info + b' '*(126-len(info)) + b'\n'
+          if len(info) != 127:
+              raise SystemExit(f'unexpected fwtool info length: {len(info)}')
           sysup=bytearray(sysup[:meta+12] + info + sysup[trailer:])
           trailer=sysup.rfind(b'FWx0')
           total_meta_len=len(sysup)-meta-4
