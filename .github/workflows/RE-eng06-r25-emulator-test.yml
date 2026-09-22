@@ -65,7 +65,9 @@ jobs:
           stock=bytearray(Path('/tmp/R25-stock.bin').read_bytes())
           sq=Path('/tmp/R25-ENG06-rootfs.squashfs').read_bytes()
           roff=0x2a7d4d
-          limit=0xb5b000
+          # Emulator-only repack may use the stock zero-padding up to the fwtool metadata at 0xb90000.
+          # This does not change the physical-router firmware layout/checkpoint; it only lets QEMU exercise the patched rootfs.
+          limit=0xb90000
           if len(sq) > limit-roff:
               raise SystemExit(f'rebuilt SquashFS too large: {len(sq)} > {limit-roff}')
           stock[roff:limit]=b'\x00'*(limit-roff)
