@@ -46,21 +46,15 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 
-old_def = 'uci set network.lan.def_ipaddr="192.168.10.1"'
-new_def = 'uci set network.lan.def_ipaddr="192.168.10.2"'
-old_ip = "uci set network.lan.ipaddr='192.168.10.1'"
-new_ip = "uci set network.lan.ipaddr='192.168.10.2'"
+stock_def = 'uci set network.lan.def_ipaddr="192.168.10.1"'
+stock_ip = "uci set network.lan.ipaddr='192.168.10.1'"
 
-if new_def in s or new_ip in s:
-    if s.count(new_def) != 2 or s.count(new_ip) != 2:
-        raise SystemExit("partial LT500D emulator LAN patch detected; refusing mixed defaults")
-else:
-    if s.count(old_def) != 2 or s.count(old_ip) != 2:
-        raise SystemExit("unexpected donor 01_network LAN defaults; refusing blind patch")
-    s = s.replace(old_def, new_def).replace(old_ip, new_ip)
-    p.write_text(s)
+if s.count(stock_def) != 2 or s.count(stock_ip) != 2:
+    raise SystemExit("unexpected donor 01_network LAN defaults; ENG06 test requires stock 192.168.10.1")
+if "192.168.10.2" in s:
+    raise SystemExit("refusing emulator-only 192.168.10.2 rewrite in ENG06 stock-IP test")
+print("PASS: preserving donor LAN default 192.168.10.1")
 PY
-
 install -m 0755 "$SELF_DIR/lt500d-r25-management.sh" "$ROOT/usr/sbin/lt500d-r25-management"
 
 python3 - "$RCLOCAL" <<'PY'
