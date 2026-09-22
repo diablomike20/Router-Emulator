@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - lt500d-r25-emulator-v1
+      - re-eng06-emulator-test
     paths:
       - "scripts/**"
       - "profiles/lt500d-r25/**"
@@ -203,8 +204,8 @@ jobs:
               echo "LT500D_HTTPS_GATE=FAIL status=$https_status"
             fi
 
-            if grep -q 'LT500D_LAN_UCI_GATE=PASS network.lan.ipaddr=192.168.10.2' scratch/lt500d-r25/qemu.serial.log &&
-               grep -q 'LT500D_LAN_IP_GATE=PASS br-lan=192.168.10.2' scratch/lt500d-r25/qemu.serial.log; then
+            if grep -q 'LT500D_LAN_UCI_GATE=PASS network.lan.ipaddr=192.168.10.1' scratch/lt500d-r25/qemu.serial.log &&
+               grep -q 'LT500D_LAN_IP_GATE=PASS br-lan=192.168.10.1' scratch/lt500d-r25/qemu.serial.log; then
               lan_ok=1
               echo "LT500D_LAN_RUNTIME_GATE=PASS"
             fi
@@ -232,7 +233,7 @@ jobs:
             exit 1
           fi
           if [ "$lan_ok" -ne 1 ]; then
-            echo "FAIL: runtime LAN identity is not verified as 192.168.10.2"
+            echo "FAIL: runtime LAN identity is not verified as 192.168.10.1"
             exit 1
           fi
 
