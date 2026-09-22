@@ -35,28 +35,59 @@ jobs:
           echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
           cp "$FLASH" /tmp/R25-stock.bin
 
-      - name: Rebuild exact ENG06 sysupgrade from stock
-        run: |
-          set -euo pipefail
-          python3 scripts/RE-LT500V2-R25-engineering-unlock-06.py /tmp/R25-stock.bin -o /tmp/RE-LT500V2-R25-ENG06-sysupgrade.bin | tee /tmp/eng06-build.log
-          echo "f9a9d8ae1419df115804fcafc752de45f3cd240c3652fe1f24aa4b935d3408b8  /tmp/RE-LT500V2-R25-ENG06-sysupgrade.bin" | sha256sum -c -
-
-      - name: Reconstruct same-layout ENG06 full image for QEMU extraction
+      - name: Build corrected ENG06 full image from patched rootfs
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          stock=Path('/tmp/R25-stock.bin').read_bytes()
-          sysup=Path('/tmp/RE-LT500V2-R25-ENG06-sysupgrade.bin').read_bytes()
-          assert stock[0x50000:0x50004] == b'\x27\x05\x19\x56'
-          assert sysup[:4] == b'\x27\x05\x19\x56'
-          full=stock[:0x50000]+sysup
-          assert len(full)==len(stock), (len(full),len(stock))
-          assert full[0x2a7d4d:0x2a7d51] == b'hsqs'
-          Path('/tmp/R25-ENG06-full-test.bin').write_bytes(full)
-          print('full_size',len(full))
+          import struct
+          b=Path('/tmp/R25-stock.bin').read_bytes()
+          roff=0x2a7d4d
+          used=struct.unpack('<Q',b[roff+40:roff+48])[0]
+          Path('/tmp/R25-stock-rootfs.squashfs').write_bytes(b[roff:roff+used])
+          print('stock_rootfs_offset',hex(roff),'bytes_used',hex(used))
           PY
-          sha256sum /tmp/R25-ENG06-full-test.bin
+          sudo rm -rf /tmp/eng06-rootfs
+          sudo unsquashfs -d /tmp/eng06-rootfs /tmp/R25-stock-rootfs.squashfs
+          sudo python3 scripts/RE-LT500V2-R25-ENG06-rootfs-patch.py /tmp/eng06-rootfs | tee /tmp/eng06-build.log
+          sudo rm -f /tmp/R25-ENG06-rootfs.squashfs
+          sudo mksquashfs /tmp/eng06-rootfs /tmp/R25-ENG06-rootfs.squashfs -comp xz -b 262144 -noappend -no-progress -all-root
+          sudo chmod 0644 /tmp/R25-ENG06-rootfs.squashfs
+          rm -rf /tmp/eng06-reextract
+          sudo unsquashfs -d /tmp/eng06-reextract /tmp/R25-ENG06-rootfs.squashfs >/tmp/eng06-reextract.log
+          test -x /tmp/eng06-reextract/sbin/procd
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          stock=bytearray(Path('/tmp/R25-stock.bin').read_bytes())
+          sq=Path('/tmp/R25-ENG06-rootfs.squashfs').read_bytes()
+          roff=0x2a7d4d
+          limit=0xb5b000
+          if len(sq) > limit-roff:
+              raise SystemExit(f'rebuilt SquashFS too large: {len(sq)} > {limit-roff}')
+          stock[roff:limit]=b'\x00'*(limit-roff)
+          stock[roff:roff+len(sq)]=sq
+          sysup=bytearray(stock[0x50000:])
+          i=sysup.rfind(b'FWx0')
+          if i < 0 or len(sysup)-i != 16:
+              raise SystemExit('final fwtool trailer not found')
+          table=[]
+          for n in range(256):
+              c=n
+              for _ in range(8):
+                  c=(c>>1)^0xedb88320 if c&1 else c>>1
+              table.append(c)
+          val=0xffffffff
+          for x in sysup[:i]:
+              val=table[(val&0xff)^x]^(val>>8)
+          sysup[i+4:i+8]=struct.pack('>I',val&0xffffffff)
+          stock[0x50000:]=sysup
+          Path('/tmp/R25-ENG06-full-test.bin').write_bytes(stock)
+          Path('/tmp/RE-LT500V2-R25-ENG06-sysupgrade-repacked.bin').write_bytes(sysup)
+          print('repacked_rootfs_file_size',len(sq),'limit',limit-roff)
+          PY
+          sha256sum /tmp/R25-ENG06-full-test.bin /tmp/RE-LT500V2-R25-ENG06-sysupgrade-repacked.bin
 
       - name: Build stock-IP emulator image from ENG06
         run: |
