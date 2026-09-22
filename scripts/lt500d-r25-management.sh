@@ -44,13 +44,13 @@ console_log "LT500D_LAN_UCI_GATE=PASS network.lan.ipaddr=192.168.10.1"
 # Require the address to be live, not merely present in UCI.
 i=0
 while [ "$i" -lt 60 ]; do
-  if ifconfig br-lan 2>/dev/null | grep -q '192\.168\.10\.2'; then
+  if ifconfig br-lan 2>/dev/null | grep -q '192\.168\.10\.1'; then
     break
   fi
   sleep 1
   i=$((i+1))
 done
-ifconfig br-lan 2>/dev/null | grep -q '192\.168\.10\.2' ||
+ifconfig br-lan 2>/dev/null | grep -q '192\.168\.10\.1' ||
   fail "br-lan did not acquire 192.168.10.1"
 console_log "LT500D_LAN_IP_GATE=PASS br-lan=192.168.10.1"
 
