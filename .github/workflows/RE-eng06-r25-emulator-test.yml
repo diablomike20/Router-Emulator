@@ -132,11 +132,19 @@ jobs:
           nc -z 127.0.0.1 2222
           nc -z 127.0.0.1 2323
 
-          SSHPASS='wiE1qkzbFQDARh0K84HTwi' sshpass -e ssh             -p 2222             -o StrictHostKeyChecking=no             -o UserKnownHostsFile=/dev/null             -o ConnectTimeout=8             root@127.0.0.1             'echo ENG06_ROOT_SSH=PASS; id; echo "---network---"; uci -q get network.lan.ipaddr; echo "---luci---"; uci -q get luci.main.showuser; echo "---rpcd---"; uci show rpcd; echo "---accounts---"; grep "^admin:" /etc/passwd /etc/shadow || true; echo "---services---"; ps w | grep -E "[d]ropbear|[t]elnetd|[h]cshd|[c]wmp|[a]utoupgrade" || true; echo "---listeners---"; netstat -lnt 2>/dev/null || true; echo "---cwmp---"; uci -q get cwmp.info.enable || true'             | tee /tmp/eng06-runtime.txt
+          SSHPASS='wiE1qkzbFQDARh0K84HTwi' sshpass -e ssh             -p 2222             -o StrictHostKeyChecking=no             -o UserKnownHostsFile=/dev/null             -o HostKeyAlgorithms=+ssh-rsa             -o PubkeyAcceptedAlgorithms=+ssh-rsa             -o ConnectTimeout=8             root@127.0.0.1             'echo ENG06_ROOT_SSH=PASS; id; echo "---network---"; uci -q get network.lan.ipaddr; echo "---luci---"; uci -q get luci.main.showuser; echo "---service-gates---"; pidof dropbear >/dev/null && echo ENG06_DROPBEAR_RUNNING=PASS || echo ENG06_DROPBEAR_RUNNING=FAIL; pidof telnetd >/dev/null && echo ENG06_TELNETD_RUNNING=PASS || echo ENG06_TELNETD_RUNNING=FAIL; /etc/init.d/dropbear enabled >/dev/null 2>&1 && echo ENG06_DROPBEAR_ENABLED=PASS || echo ENG06_DROPBEAR_ENABLED=FAIL; /etc/init.d/telnet enabled >/dev/null 2>&1 && echo ENG06_TELNET_ENABLED=PASS || echo ENG06_TELNET_ENABLED=FAIL; pidof hcshd >/dev/null 2>&1 && echo ENG06_HCSHD_DISABLED=FAIL || echo ENG06_HCSHD_DISABLED=PASS; echo "---cwmp---"; CWMP=$(uci -q get cwmp.info.enable || true); echo "$CWMP"; [ "$CWMP" = off ] && echo ENG06_CWMP_DEFAULT_OFF=PASS || echo ENG06_CWMP_DEFAULT_OFF=FAIL; (pidof cwmp >/dev/null 2>&1 || pidof tr069 >/dev/null 2>&1) && echo ENG06_CWMP_DAEMONS_STOPPED=FAIL || echo ENG06_CWMP_DAEMONS_STOPPED=PASS; echo "---autoupgrade---"; ps w | grep -q "[a]utoupgrade" && echo ENG06_AUTOUPGRADE_STOPPED=FAIL || echo ENG06_AUTOUPGRADE_STOPPED=PASS; echo "---listeners---"; netstat -lnt 2>/dev/null || true; echo "---rpcd---"; uci show rpcd 2>/dev/null || true; echo "---accounts---"; grep "^admin:" /etc/passwd /etc/shadow 2>/dev/null || true'             | tee /tmp/eng06-runtime.txt
 
           grep -F "ENG06_ROOT_SSH=PASS" /tmp/eng06-runtime.txt
           grep -Fx "192.168.10.1" /tmp/eng06-runtime.txt
           grep -Fx "1" /tmp/eng06-runtime.txt
+          grep -F "ENG06_DROPBEAR_RUNNING=PASS" /tmp/eng06-runtime.txt
+          grep -F "ENG06_TELNETD_RUNNING=PASS" /tmp/eng06-runtime.txt
+          grep -F "ENG06_DROPBEAR_ENABLED=PASS" /tmp/eng06-runtime.txt
+          grep -F "ENG06_TELNET_ENABLED=PASS" /tmp/eng06-runtime.txt
+          grep -F "ENG06_HCSHD_DISABLED=PASS" /tmp/eng06-runtime.txt
+          grep -F "ENG06_CWMP_DEFAULT_OFF=PASS" /tmp/eng06-runtime.txt
+          grep -F "ENG06_CWMP_DAEMONS_STOPPED=PASS" /tmp/eng06-runtime.txt
+          grep -F "ENG06_AUTOUPGRADE_STOPPED=PASS" /tmp/eng06-runtime.txt
           if grep -q '[h]cshd' /tmp/eng06-runtime.txt; then
             echo "FAIL: hcshd unexpectedly running"
             exit 1
