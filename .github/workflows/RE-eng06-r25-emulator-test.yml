@@ -70,34 +70,48 @@ jobs:
           limit=0xb90000
           if len(sq) > limit-roff:
               raise SystemExit(f'rebuilt SquashFS too large: {len(sq)} > {limit-roff}')
-          stock[roff:limit]=b'\x00'*(limit-roff)
+          # Preserve stock post-SquashFS eraseblock padding/JFFS2 EOF markers.
+          # Only overwrite the new SquashFS bytes; do not zero the remainder.
           stock[roff:roff+len(sq)]=sq
           sysup=bytearray(stock[0x50000:])
-          i=sysup.rfind(b'FWx0')
-          if i < 0 or len(sysup)-i != 16:
-              raise SystemExit('final fwtool trailer not found')
+
+          # Rebuild fwtool metadata for both the native Cudy board ID and OpenWrt 23.05 device ID.
+          meta=sysup.rfind(b'\xde\xad\xc0\xde')
+          trailer=sysup.rfind(b'FWx0')
+          if meta < 0 or trailer < 0 or len(sysup)-trailer != 16 or meta >= trailer:
+              raise SystemExit('fwtool metadata/trailer not found')
+          info=b'{"supported_devices":["cudy,lt500-v2","R25"],"version":{"dist":"LEDE","version":"17.01.5","revision":"2.4.16","board":"ramips"}}\n'
+          sysup=bytearray(sysup[:meta+12] + info + sysup[trailer:])
+          trailer=sysup.rfind(b'FWx0')
+          total_meta_len=len(sysup)-meta-4
+          sysup[trailer+9:trailer+16]=total_meta_len.to_bytes(7,'big')
+
           table=[]
           for n in range(256):
-              c=n
+              crc=n
               for _ in range(8):
-                  c=(c>>1)^0xedb88320 if c&1 else c>>1
-              table.append(c)
+                  crc=(crc>>1)^0xedb88320 if crc&1 else crc>>1
+              table.append(crc)
           val=0xffffffff
-          for x in sysup[:i]:
+          for x in sysup[:trailer]:
               val=table[(val&0xff)^x]^(val>>8)
-          sysup[i+4:i+8]=struct.pack('>I',val&0xffffffff)
-          stock[0x50000:]=sysup
-          Path('/tmp/R25-ENG06-full-test.bin').write_bytes(stock)
-          Path('/tmp/RE-LT500V2-R25-ENG06-sysupgrade-repacked.bin').write_bytes(sysup)
+          sysup[trailer+4:trailer+8]=struct.pack('>I',val&0xffffffff)
+
+          # Exact router-test sysupgrade + matching full image for emulator validation.
+          stock=bytearray(stock[:0x50000] + sysup)
+          Path('/tmp/R25-ENG07-router-safe-full-test.bin').write_bytes(stock)
+          Path('/tmp/RE-LT500V2-R25-ENG07-router-safe-sysupgrade.bin').write_bytes(sysup)
           print('repacked_rootfs_file_size',len(sq),'limit',limit-roff)
+          print('router_safe_sysupgrade_size',len(sysup),'metadata_offset',hex(meta),'trailer_offset',hex(trailer))
+          print('preserved_marker_b20000',sysup[0xb20000:0xb20004].hex())
           PY
-          sha256sum /tmp/R25-ENG06-full-test.bin /tmp/RE-LT500V2-R25-ENG06-sysupgrade-repacked.bin
+          sha256sum /tmp/R25-ENG07-router-safe-full-test.bin /tmp/RE-LT500V2-R25-ENG07-router-safe-sysupgrade.bin
 
       - name: Build stock-IP emulator image from ENG06
         run: |
           set -euo pipefail
           export LT500D_ALLOW_MODIFIED_IMAGE=1
-          bash scripts/make.lt500d-r25-emulator.macos.sh /tmp/R25-ENG06-full-test.bin scratch/eng06
+          bash scripts/make.lt500d-r25-emulator.macos.sh /tmp/R25-ENG07-router-safe-full-test.bin scratch/eng06
           grep -F "192.168.10.1" scratch/eng06/rootfs/etc/uci-defaults/01_network
           ! grep -Fq "192.168.10.2" scratch/eng06/rootfs/etc/uci-defaults/01_network
 
@@ -168,6 +182,8 @@ jobs:
           name: RE-LT500V2-R25-ENG06-EMULATOR-EVIDENCE
           if-no-files-found: ignore
           path: |
+            /tmp/RE-LT500V2-R25-ENG07-router-safe-sysupgrade.bin
+            /tmp/R25-ENG07-router-safe-full-test.bin
             /tmp/eng06-build.log
             /tmp/eng06-runtime.txt
             /tmp/eng06-luci.headers
