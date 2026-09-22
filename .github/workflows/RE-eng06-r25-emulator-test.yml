@@ -51,7 +51,7 @@ jobs:
           sudo unsquashfs -d /tmp/eng06-rootfs /tmp/R25-stock-rootfs.squashfs
           sudo python3 scripts/RE-LT500V2-R25-ENG06-rootfs-patch.py /tmp/eng06-rootfs | tee /tmp/eng06-build.log
           sudo rm -f /tmp/R25-ENG06-rootfs.squashfs
-          sudo mksquashfs /tmp/eng06-rootfs /tmp/R25-ENG06-rootfs.squashfs -comp xz -b 262144 -noappend -no-progress -all-root
+          sudo mksquashfs /tmp/eng06-rootfs /tmp/R25-ENG06-rootfs.squashfs -comp xz -b 262144 -noappend -no-progress -all-root -no-exports -nopad
           sudo chmod 0644 /tmp/R25-ENG06-rootfs.squashfs
           rm -rf /tmp/eng06-reextract
           sudo unsquashfs -d /tmp/eng06-reextract /tmp/R25-ENG06-rootfs.squashfs >/tmp/eng06-reextract.log
