@@ -53,7 +53,7 @@ jobs:
           sudo rm -f /tmp/R25-ENG06-rootfs.squashfs
           git clone --depth 1 https://github.com/plougher/squashfs-tools.git /tmp/squashfs-tools
           make -C /tmp/squashfs-tools/squashfs-tools LZMA_XZ_SUPPORT=1 XZ_SUPPORT=1 mksquashfs
-          sudo /tmp/squashfs-tools/squashfs-tools/mksquashfs /tmp/eng06-rootfs /tmp/R25-ENG06-rootfs.squashfs -nopad -noappend -root-owned -comp xz -Xdict-size 100% -b 262144 -processors 1 -no-xattrs -always-use-fragments -no-progress
+          sudo /tmp/squashfs-tools/squashfs-tools/mksquashfs /tmp/eng06-rootfs /tmp/R25-ENG06-rootfs.squashfs -nopad -noappend -root-owned -comp xz -Xdict-size 100% -b 524288 -processors 1 -no-xattrs -always-use-fragments -no-progress
           sudo chmod 0644 /tmp/R25-ENG06-rootfs.squashfs
           rm -rf /tmp/eng06-reextract
           sudo unsquashfs -d /tmp/eng06-reextract /tmp/R25-ENG06-rootfs.squashfs >/tmp/eng06-reextract.log
