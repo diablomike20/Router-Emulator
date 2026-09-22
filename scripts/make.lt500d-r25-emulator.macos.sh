@@ -20,7 +20,11 @@ SQUASH_OFFSET=$((0x2a7d4d))
 [ -f "$FLASH" ] || { echo "Missing donor firmware: $FLASH"; exit 1; }
 ACTUAL_SHA="$(shasum -a 256 "$FLASH" | awk '{print $1}')"
 ACTUAL_SIZE="$(wc -c < "$FLASH" | tr -d ' ')"
-[ "$ACTUAL_SHA" = "$EXPECTED_SHA" ] || { echo "Donor SHA256 mismatch: $ACTUAL_SHA"; exit 1; }
+if [ "${LT500D_ALLOW_MODIFIED_IMAGE:-0}" = "1" ]; then
+  echo "TEST MODE: accepting modified same-layout R25 image sha256=$ACTUAL_SHA"
+else
+  [ "$ACTUAL_SHA" = "$EXPECTED_SHA" ] || { echo "Donor SHA256 mismatch: $ACTUAL_SHA"; exit 1; }
+fi
 [ "$ACTUAL_SIZE" = "$EXPECTED_SIZE" ] || { echo "Donor size mismatch: $ACTUAL_SIZE"; exit 1; }
 
 mkdir -p "$WORK"
