@@ -1,0 +1,133 @@
+name: RE ENG06 LT500D R25 emulator test
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - re-eng06-emulator-test
+  workflow_dispatch:
+
+jobs:
+  eng06-emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install emulator dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 libdigest-sha-perl sshpass netcat-openbsd
+
+      - name: Download verified stock R25 firmware
+        run: |
+          set -euo pipefail
+          URL='https://www.cudy.com/cdn/shop/files/LT500V2-R25-2.4.16-20250804-150319-flash.zip?v=5016960833307663900'
+          curl -fL --retry 4 --retry-delay 2 -o /tmp/r25.zip "$URL"
+          mkdir -p /tmp/r25-fw
+          unzip -j /tmp/r25.zip -d /tmp/r25-fw
+          FLASH="$(find /tmp/r25-fw -type f -name '*flash.bin' | head -1)"
+          test -n "$FLASH"
+          test "$(stat -c %s "$FLASH")" = "12124315"
+          echo "57aed945a9f485d178d73a844e420fc2b441e60821e243d3d19d07dd4a3143d6  $FLASH" | sha256sum -c -
+          cp "$FLASH" /tmp/R25-stock.bin
+
+      - name: Rebuild exact ENG06 sysupgrade from stock
+        run: |
+          set -euo pipefail
+          python3 scripts/RE-LT500V2-R25-engineering-unlock-06.py /tmp/R25-stock.bin -o /tmp/RE-LT500V2-R25-ENG06-sysupgrade.bin | tee /tmp/eng06-build.log
+          echo "f9a9d8ae1419df115804fcafc752de45f3cd240c3652fe1f24aa4b935d3408b8  /tmp/RE-LT500V2-R25-ENG06-sysupgrade.bin" | sha256sum -c -
+
+      - name: Reconstruct same-layout ENG06 full image for QEMU extraction
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          stock=Path('/tmp/R25-stock.bin').read_bytes()
+          sysup=Path('/tmp/RE-LT500V2-R25-ENG06-sysupgrade.bin').read_bytes()
+          assert stock[0x50000:0x50004] == b'\x27\x05\x19\x56'
+          assert sysup[:4] == b'\x27\x05\x19\x56'
+          full=stock[:0x50000]+sysup
+          assert len(full)==len(stock), (len(full),len(stock))
+          assert full[0x2a7d4d:0x2a7d51] == b'hsqs'
+          Path('/tmp/R25-ENG06-full-test.bin').write_bytes(full)
+          print('full_size',len(full))
+          PY
+          sha256sum /tmp/R25-ENG06-full-test.bin
+
+      - name: Build stock-IP emulator image from ENG06
+        run: |
+          set -euo pipefail
+          export LT500D_ALLOW_MODIFIED_IMAGE=1
+          bash scripts/make.lt500d-r25-emulator.macos.sh /tmp/R25-ENG06-full-test.bin scratch/eng06
+          grep -F "192.168.10.1" scratch/eng06/rootfs/etc/uci-defaults/01_network
+          ! grep -Fq "192.168.10.2" scratch/eng06/rootfs/etc/uci-defaults/01_network
+
+      - name: Boot ENG06 and run runtime gates
+        run: |
+          set -euo pipefail
+          rm -f scratch/eng06/qemu.serial.log
+          LT500D_SERIAL_LOG="$PWD/scratch/eng06/qemu.serial.log" bash scripts/start.lt500d-r25.sh scratch/eng06/image.raw &
+          QEMU_PID=$!
+          echo "$QEMU_PID" >/tmp/eng06-qemu.pid
+
+          ok=0
+          for i in $(seq 1 150); do
+            if curl -sS --connect-timeout 0.5 --max-time 1 -o /tmp/sysauth.js http://127.0.0.1:8080/luci-static/bootstrap/js/sysauth.js && [ -s /tmp/sysauth.js ]; then
+              ok=1
+              break
+            fi
+            kill -0 "$QEMU_PID" 2>/dev/null || break
+            sleep 1
+          done
+          test "$ok" = 1
+
+          bash scripts/smoke.lt500d-r25-http.sh /tmp/eng06-http
+
+          grep -F "LT500D_LAN_UCI_GATE=PASS network.lan.ipaddr=192.168.10.1" scratch/eng06/qemu.serial.log
+          grep -F "LT500D_LAN_IP_GATE=PASS br-lan=192.168.10.1" scratch/eng06/qemu.serial.log
+
+          for i in $(seq 1 60); do
+            nc -z 127.0.0.1 2222 && break
+            sleep 1
+          done
+          nc -z 127.0.0.1 2222
+          nc -z 127.0.0.1 2323
+
+          SSHPASS='wiE1qkzbFQDARh0K84HTwi' sshpass -e ssh             -p 2222             -o StrictHostKeyChecking=no             -o UserKnownHostsFile=/dev/null             -o ConnectTimeout=8             root@127.0.0.1             'echo ENG06_ROOT_SSH=PASS; id; echo "---network---"; uci -q get network.lan.ipaddr; echo "---luci---"; uci -q get luci.main.showuser; echo "---rpcd---"; uci show rpcd; echo "---accounts---"; grep "^admin:" /etc/passwd /etc/shadow || true; echo "---services---"; ps w | grep -E "[d]ropbear|[t]elnetd|[h]cshd|[c]wmp|[a]utoupgrade" || true; echo "---listeners---"; netstat -lnt 2>/dev/null || true; echo "---cwmp---"; uci -q get cwmp.info.enable || true'             | tee /tmp/eng06-runtime.txt
+
+          grep -F "ENG06_ROOT_SSH=PASS" /tmp/eng06-runtime.txt
+          grep -Fx "192.168.10.1" /tmp/eng06-runtime.txt
+          grep -Fx "1" /tmp/eng06-runtime.txt
+          if grep -q '[h]cshd' /tmp/eng06-runtime.txt; then
+            echo "FAIL: hcshd unexpectedly running"
+            exit 1
+          fi
+
+          curl -sS --connect-timeout 2 --max-time 10 -H 'Host: cudy.net' -D /tmp/eng06-luci.headers -o /tmp/eng06-luci.html http://127.0.0.1:8080/cgi-bin/luci/ || true
+          grep -Eqi 'Cudy|sysauth|Create an administrator password|Username|Password' /tmp/eng06-luci.html
+          echo ENG06_WEB_LOGIN_PAGE=PASS
+
+      - name: Stop QEMU
+        if: always()
+        run: |
+          if [ -f /tmp/eng06-qemu.pid ]; then
+            kill "$(cat /tmp/eng06-qemu.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload ENG06 emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RE-LT500V2-R25-ENG06-EMULATOR-EVIDENCE
+          if-no-files-found: ignore
+          path: |
+            /tmp/eng06-build.log
+            /tmp/eng06-runtime.txt
+            /tmp/eng06-luci.headers
+            /tmp/eng06-luci.html
+            /tmp/eng06-http*
+            scratch/eng06/qemu.serial.log
