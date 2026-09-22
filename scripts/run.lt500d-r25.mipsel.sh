@@ -24,6 +24,6 @@ exec qemu-system-mipsel \
   -device e1000,netdev=donor0 \
   -netdev user,id=donor0,net=10.0.3.0/24 \
   -device e1000,netdev=mgmt1 \
-  -netdev user,id=mgmt1,net=192.168.10.0/24,host=192.168.10.254,hostfwd=tcp:127.0.0.1:8080-192.168.10.1:80,hostfwd=tcp:127.0.0.1:8443-192.168.10.1:443 \
+  -netdev user,id=mgmt1,net=192.168.10.0/24,host=192.168.10.254,hostfwd=tcp:127.0.0.1:8080-192.168.10.1:80,hostfwd=tcp:127.0.0.1:8443-192.168.10.1:443,hostfwd=tcp:127.0.0.1:2222-192.168.10.1:22,hostfwd=tcp:127.0.0.1:2323-192.168.10.1:23 \
   -serial "file:$SERIAL_LOG" \
   -display none
