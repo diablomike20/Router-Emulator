@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: f9k1103-lede-17.01.5-build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-22.04
