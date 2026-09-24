@@ -99,17 +99,8 @@ replace_once(
     '\tf7c027|\\\n\tf9k1103|\\\n'
 )
 
-# 6. Basic LED defaults. The DTS owns GPIO/polarity; UCI only supplies triggers.
-replace_once(
-    'target/linux/ramips/base-files/etc/board.d/01_leds',
-    '\tf5d8235-v1)\n',
-    '''\tf9k1103)
-\t\tucidef_set_led_default "power" "POWER" "f9k1103:power" "1"
-\t\tset_usb_led "f9k1103:usb"
-\t\t;;
-\tf5d8235-v1)
-'''
-)
+# 6. LED GPIOs are defined directly in the DTS; no board.d patch is required.
+
 PY
 
 git diff --   target/linux/ramips/dts/F9K1103.dts   target/linux/ramips/image/rt3883.mk   target/linux/ramips/base-files/lib/ramips.sh   target/linux/ramips/base-files/etc/board.d/01_leds   target/linux/ramips/base-files/etc/board.d/02_network   target/linux/ramips/base-files/lib/upgrade/platform.sh   > "$GITHUB_WORKSPACE/F9K1103-LEDE-17.01.5.patch"
