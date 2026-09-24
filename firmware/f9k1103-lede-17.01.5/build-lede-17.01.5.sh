@@ -93,8 +93,7 @@ define Device/f9k1103
   # F9K110x platform family. Embed the LZMA kernel in OpenWrt's tiny
   # self-relocating loader and mark the outer uImage as uncompressed.
   LOADER_TYPE := bin
-  KERNEL/lzma-loader := kernel-bin | patch-dtb | lzma | loader-kernel
-  KERNEL := $(KERNEL/lzma-loader) | uImage none
+  KERNEL := kernel-bin | patch-dtb | lzma | loader-kernel | uImage none
   DEVICE_TITLE := Belkin F9K1103 v1
   DEVICE_PACKAGES := kmod-usb-core kmod-usb-ohci kmod-usb2 swconfig
 endef
