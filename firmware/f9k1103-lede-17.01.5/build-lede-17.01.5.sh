@@ -34,6 +34,13 @@ sed -i 's#PKG_SOURCE_URL=$(LEDE_GIT)/keyring.git#PKG_SOURCE_URL:=https://github.
   package/system/lede-keyring/Makefile
 
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/F9K1103.dts" target/linux/ramips/dts/
+# The loader-common image command comes from later ramips, whose lzma-loader
+# Makefile accepts a PLATFORM override. LEDE 17.01.5 hardcodes PLATFORM and
+# therefore treats the command-line PLATFORM variable as an implicit make
+# target ("ralink"), producing the misleading "cc -o .o" failure.
+# Backport the one-line PLATFORM variable change from OpenWrt 18.06.
+sed -i 's/^BOARD[[:space:]]*:=$/BOARD\t\t:=\nPLATFORM\t:=/' target/linux/ramips/image/lzma-loader/Makefile
+sed -i 's/PLATFORM="ralink" \\\\/PLATFORM="$(PLATFORM)" \\\\/' target/linux/ramips/image/lzma-loader/Makefile
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/010-glibc-change-work-around.patch" tools/m4/patches/010-glibc-change-work-around.patch
 # Backport OpenWrt's own post-17.01 host-glibc compatibility fixes.
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/010-m4-glibc-change-work-around.patch" tools/m4/patches/010-glibc-change-work-around.patch
