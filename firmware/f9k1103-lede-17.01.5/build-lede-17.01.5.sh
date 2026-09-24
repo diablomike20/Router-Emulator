@@ -13,6 +13,11 @@ cd "$WORKDIR"
 git clone --depth 1 --branch "$LEDE_TAG" https://github.com/lede-project/source.git lede
 cd lede
 
+# LEDE 17.01.5 ships m4 1.4.18 with old gnulib code that fails on
+# glibc >= 2.28. Backport OpenWrt's later compatibility patch verbatim.
+wget -qO tools/m4/patches/010-glibc-change-work-around.patch \
+  https://raw.githubusercontent.com/openwrt/openwrt/v19.07.0/tools/m4/patches/010-glibc-change-work-around.patch
+
 # The historical feed host was retired; use the GitHub mirrors while keeping
 # the exact commits pinned by LEDE v17.01.5.
 sed -i \
