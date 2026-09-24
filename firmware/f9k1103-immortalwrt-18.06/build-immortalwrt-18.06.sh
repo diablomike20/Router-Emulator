@@ -87,7 +87,7 @@ Target device: Belkin F9K1103 v1
 Target: ramips/rt3883
 uImage name: N750F9K1103VB
 Firmware partition: 0x50000 + 0x7a0000
-Status: PORT-WIP / build validation required / NOT hardware-runtime-verified
+Status: PORT-WIP / build validation required / NOT hardware-runtime-verified\nBuild pipeline revision: 2
 EOF
 
 python3 - "$OUT" <<'PY'
