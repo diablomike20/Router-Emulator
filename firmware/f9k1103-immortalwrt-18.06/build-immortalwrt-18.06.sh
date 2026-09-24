@@ -43,6 +43,7 @@ define Device/belkin_f9k1103v1
   KERNEL := kernel-bin | append-dtb | lzma -d16 | uImage lzma
   UIMAGE_NAME := N750F9K1103VB
 endef
+TARGET_DEVICES += belkin_f9k1103v1
 '''
 replace_once(p,anchor,profile)
 
