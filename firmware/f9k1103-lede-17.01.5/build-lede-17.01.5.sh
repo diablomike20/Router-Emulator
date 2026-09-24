@@ -27,6 +27,12 @@ sed -i \
   -e 's#https://git.lede-project.org/feed/telephony.git#https://github.com/openwrt/telephony.git#' \
   feeds.conf.default
 
+# LEDE's historical keyring Git host now presents an OpenWrt certificate and
+# fails strict TLS validation. Keep the exact pinned 2017 commit, but fetch it
+# from the official OpenWrt GitHub mirror.
+sed -i 's#PKG_SOURCE_URL=$(LEDE_GIT)/keyring.git#PKG_SOURCE_URL:=https://github.com/openwrt/keyring.git#' \
+  package/system/lede-keyring/Makefile
+
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/F9K1103.dts" target/linux/ramips/dts/
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/010-glibc-change-work-around.patch" tools/m4/patches/010-glibc-change-work-around.patch
 # Backport OpenWrt's own post-17.01 host-glibc compatibility fixes.
