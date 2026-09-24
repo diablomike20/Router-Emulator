@@ -10,9 +10,11 @@ rm -rf "$WORKDIR" "$OUT"
 mkdir -p "$WORKDIR" "$OUT"
 cd "$WORKDIR"
 
-git clone https://github.com/immortalwrt/immortalwrt.git immortalwrt
+git init immortalwrt
 cd immortalwrt
-git checkout "$IWRT_COMMIT"
+git remote add origin https://github.com/immortalwrt/immortalwrt.git
+git fetch --depth 1 origin "$IWRT_COMMIT"
+git checkout --detach FETCH_HEAD
 
 cp "${GITHUB_WORKSPACE}/firmware/f9k1103-immortalwrt18/rt3883_belkin_f9k1103v1.dts" target/linux/ramips/dts/
 
