@@ -7,47 +7,37 @@
 	model = "Belkin F9K1103 Version 1.0";
 
 	aliases {
-		led-boot = &led_status_amber;
-		led-failsafe = &led_status_amber;
-		led-running = &led_status_blue;
-		led-upgrade = &led_status_amber;
+		led-boot = &led_power;
+		led-failsafe = &led_power;
+		led-running = &led_power;
+		led-upgrade = &led_power;
 	};
 
 	leds {
 		compatible = "gpio-leds";
 
-		led_status_amber: internet_amber {
-			label = "amber:internet";
-			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-		};
-
-		led_status_blue: internet_blue {
-			label = "blue:internet";
-			gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
-		};
-
-		usb1 {
-			label = "green:usb1";
-			gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
-			trigger-sources = <&ohci_port1>, <&ehci_port1>;
-			linux,default-trigger = "usbport";
-		};
-
-		usb2 {
-			label = "green:usb2";
-			gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
-			trigger-sources = <&ohci_port2>, <&ehci_port2>;
-			linux,default-trigger = "usbport";
-		};
-
-		wps_amber {
-			label = "amber:wps";
+		/* F9K1103/BN750DB board.h: POWER=0 LAN=13 WAN=12 USB=9 */
+		led_power: power {
+			label = "power";
 			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
 		};
 
-		wps_blue {
-			label = "blue:wps";
-			gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+		lan {
+			label = "lan";
+			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+		};
+
+		wan {
+			label = "wan";
+			gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+		};
+
+		usb {
+			label = "usb";
+			gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
+					  <&ohci_port2>, <&ehci_port2>;
+			linux,default-trigger = "usbport";
 		};
 	};
 
@@ -55,6 +45,7 @@
 		compatible = "gpio-keys-polled";
 		poll-interval = <100>;
 
+		/* F9K1103/BN750DB board.h: RESET=25 WPS=26 */
 		reset {
 			label = "reset";
 			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
