@@ -9,9 +9,11 @@ rm -rf "$WORKDIR" "$OUT"
 mkdir -p "$WORKDIR" "$OUT"
 cd "$WORKDIR"
 
-git clone https://github.com/immortalwrt/immortalwrt.git immortalwrt
+git init immortalwrt
 cd immortalwrt
-git checkout "$IWRT_COMMIT"
+git remote add origin https://github.com/immortalwrt/immortalwrt.git
+git fetch --depth 1 origin "$IWRT_COMMIT"
+git checkout --detach FETCH_HEAD
 
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-immortalwrt-18.06/rt3883_belkin_f9k1103v1.dts"    target/linux/ramips/dts/
 
@@ -65,7 +67,8 @@ CONFIG_PACKAGE_luci=y
 CFG
 
 make defconfig
-make -j2 download
+cp .config "$OUT/BUILD-CONFIG.txt"
+make -j2 download V=s
 make -j2 V=s
 
 cp -av bin/targets/ramips/rt3883/*f9k1103v1* "$OUT/"
