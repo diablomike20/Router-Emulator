@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# GitHub container runs as root; GNU tar's configure blocks this by default.
+export FORCE_UNSAFE_CONFIGURE=1
+
 IWRT_COMMIT=cab1e2e283d048f8f0fa3f31133510c86b30fd83
 WORKDIR="${PWD}/_f9k1103_immortalwrt1806_build"
 OUT="${GITHUB_WORKSPACE}/out-f9k1103-immortalwrt-18.06"
