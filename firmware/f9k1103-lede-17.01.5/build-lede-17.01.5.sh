@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export FORCE_UNSAFE_CONFIGURE=1
 
 LEDE_TAG=v17.01.5
 WORKDIR="${PWD}/_f9k1103_lede17015_build"
