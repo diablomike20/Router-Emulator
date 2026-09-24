@@ -39,8 +39,20 @@ cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/F9K1103.dts" target/linux/ra
 # therefore treats the command-line PLATFORM variable as an implicit make
 # target ("ralink"), producing the misleading "cc -o .o" failure.
 # Backport the one-line PLATFORM variable change from OpenWrt 18.06.
-sed -i 's/^BOARD[[:space:]]*:=$/BOARD\t\t:=\nPLATFORM\t:=/' target/linux/ramips/image/lzma-loader/Makefile
-sed -i 's/PLATFORM="ralink" \\\\/PLATFORM="$(PLATFORM)" \\\\/' target/linux/ramips/image/lzma-loader/Makefile
+python3 - <<'PY_LOADER'
+from pathlib import Path
+p=Path('target/linux/ramips/image/lzma-loader/Makefile')
+s=p.read_text()
+old='BOARD\t\t:=\n'
+if old not in s:
+    raise SystemExit('lzma-loader BOARD anchor not found')
+s=s.replace(old, old+'PLATFORM\t:=\n', 1)
+old='\t\tPLATFORM="ralink" \\\n'
+if old not in s:
+    raise SystemExit('lzma-loader PLATFORM anchor not found')
+s=s.replace(old, '\t\tPLATFORM="$(PLATFORM)" \\\n', 1)
+p.write_text(s)
+PY_LOADER
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/010-glibc-change-work-around.patch" tools/m4/patches/010-glibc-change-work-around.patch
 # Backport OpenWrt's own post-17.01 host-glibc compatibility fixes.
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/010-m4-glibc-change-work-around.patch" tools/m4/patches/010-glibc-change-work-around.patch
