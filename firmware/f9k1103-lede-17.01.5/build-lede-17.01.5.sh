@@ -28,6 +28,7 @@ sed -i \
   feeds.conf.default
 
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/F9K1103.dts" target/linux/ramips/dts/
+cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/010-glibc-change-work-around.patch" tools/m4/patches/010-glibc-change-work-around.patch
 # Backport OpenWrt's own post-17.01 host-glibc compatibility fixes.
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/010-m4-glibc-change-work-around.patch" tools/m4/patches/010-glibc-change-work-around.patch
 cp "$GITHUB_WORKSPACE/firmware/f9k1103-lede-17.01.5/110-findutils-glibc-change-work-around.patch" tools/findutils/patches/110-glibc-change-work-around.patch
@@ -53,6 +54,7 @@ define Device/f9k1103
   BLOCKSIZE := 64k
   IMAGE_SIZE := 7808k
   UIMAGE_NAME := N750F9K1103VB
+  KERNEL := kernel-bin | patch-dtb | lzma -d16 | uImage lzma
   DEVICE_TITLE := Belkin F9K1103 v1
   DEVICE_PACKAGES := kmod-usb-core kmod-usb-ohci kmod-usb2 swconfig
 endef
