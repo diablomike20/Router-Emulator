@@ -51,6 +51,33 @@ def replace_once(path, old, new):
         raise SystemExit(f'anchor not found in {path}: {old!r}')
     p.write_text(s.replace(old,new,1))
 
+# 0. Backport the later ramips embedded LZMA loader image command.
+# LEDE 17.01.5 already contains target/linux/ramips/image/lzma-loader;
+# it only lacks the image-pipeline wrapper added later upstream.
+replace_once(
+    'target/linux/ramips/image/Makefile',
+    '''define Build/relocate-kernel
+''',
+    '''define Build/loader-common
+\trm -rf $@.src
+\t$(MAKE) -C lzma-loader \\\
+\t\tPKG_BUILD_DIR="$@.src" \\\
+\t\tTARGET_DIR="$(dir $@)" LOADER_NAME="$(notdir $@)" \\\
+\t\tBOARD="$(BOARDNAME)" PLATFORM="ralink" \\\
+\t\tLZMA_TEXT_START=0x81800000 LOADADDR=$(KERNEL_LOADADDR) \\\
+\t\t$(1) compile loader.$(LOADER_TYPE)
+\tmv "$@.$(LOADER_TYPE)" "$@"
+\trm -rf $@.src
+endef
+
+define Build/loader-kernel
+\t$(call Build/loader-common,LOADER_DATA="$@")
+endef
+
+define Build/relocate-kernel
+''',
+)
+
 # 1. Image recipe. 7808 KiB == 0x7a0000 firmware partition.
 replace_once(
     'target/linux/ramips/image/rt3883.mk',
@@ -62,7 +89,12 @@ define Device/f9k1103
   BLOCKSIZE := 64k
   IMAGE_SIZE := 7808k
   UIMAGE_NAME := N750F9K1103VB
-  KERNEL := kernel-bin | patch-dtb | lzma -d16 | uImage lzma
+  # Belkin's stock U-Boot has known LZMA decompression issues on this
+  # F9K110x platform family. Embed the LZMA kernel in OpenWrt's tiny
+  # self-relocating loader and mark the outer uImage as uncompressed.
+  LOADER_TYPE := bin
+  KERNEL/lzma-loader := kernel-bin | patch-dtb | lzma | loader-kernel
+  KERNEL := $(KERNEL/lzma-loader) | uImage none
   DEVICE_TITLE := Belkin F9K1103 v1
   DEVICE_PACKAGES := kmod-usb-core kmod-usb-ohci kmod-usb2 swconfig
 endef
@@ -122,7 +154,7 @@ replace_once(
 
 PY
 
-git diff --   target/linux/ramips/dts/F9K1103.dts   target/linux/ramips/image/rt3883.mk   target/linux/ramips/base-files/lib/ramips.sh   target/linux/ramips/base-files/etc/board.d/01_leds   target/linux/ramips/base-files/etc/board.d/02_network   target/linux/ramips/base-files/lib/upgrade/platform.sh   > "$GITHUB_WORKSPACE/F9K1103-LEDE-17.01.5.patch"
+git diff --   target/linux/ramips/dts/F9K1103.dts   target/linux/ramips/image/Makefile   target/linux/ramips/image/rt3883.mk   target/linux/ramips/base-files/lib/ramips.sh   target/linux/ramips/base-files/etc/board.d/01_leds   target/linux/ramips/base-files/etc/board.d/02_network   target/linux/ramips/base-files/lib/upgrade/platform.sh   > "$GITHUB_WORKSPACE/F9K1103-LEDE-17.01.5.patch"
 
 ./scripts/feeds update -a
 ./scripts/feeds install -a
@@ -181,6 +213,7 @@ for p in bins:
         hcrc==calc_h and
         dcrc==calc_d and
         name=='N750F9K1103VB' and
+        comp==0 and
         len(b)<=0x7a0000 and
         squash>=0
     )
@@ -191,6 +224,7 @@ for p in bins:
         f'uimage_magic=0x{magic:08x}',
         f'uimage_name={name}',
         f'uimage_payload_size={size}',
+        f'outer_compression={comp} (0=none)',
         f'load=0x{load:08x}',
         f'entry=0x{entry:08x}',
         f'header_crc_ok={hcrc==calc_h}',
