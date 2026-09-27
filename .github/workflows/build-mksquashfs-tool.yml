@@ -1,0 +1,28 @@
+name: Build mksquashfs tooling
+
+on:
+  push:
+    branches:
+      - tooling/r25-csp25-mksquashfs
+
+jobs:
+  build-tool:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install squashfs-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools
+      - name: Collect tool
+        run: |
+          mkdir -p artifact
+          cp /usr/bin/mksquashfs artifact/mksquashfs-x86_64
+          chmod 0755 artifact/mksquashfs-x86_64
+          /usr/bin/mksquashfs -version | tee artifact/MKSQUASHFS-VERSION.txt
+          sha256sum artifact/mksquashfs-x86_64 > artifact/SHA256SUMS.txt
+      - name: Upload tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: r25-csp25-mksquashfs-x86_64
+          path: artifact/
+          if-no-files-found: error
