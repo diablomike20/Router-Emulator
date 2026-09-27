@@ -1,4 +1,4 @@
-name: Build squashfs tooling
+name: Build firmware audit tooling
 
 on:
   push:
@@ -9,22 +9,24 @@ jobs:
   build-tool:
     runs-on: ubuntu-latest
     steps:
-      - name: Install squashfs-tools
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y squashfs-tools
+          sudo apt-get install -y squashfs-tools qemu-user-static
       - name: Collect tools
         run: |
           mkdir -p artifact
           cp /usr/bin/mksquashfs artifact/mksquashfs-x86_64
           cp /usr/bin/unsquashfs artifact/unsquashfs-x86_64
-          chmod 0755 artifact/mksquashfs-x86_64 artifact/unsquashfs-x86_64
+          cp /usr/bin/qemu-mipsel-static artifact/qemu-mipsel-static
+          chmod 0755 artifact/*
           /usr/bin/mksquashfs -version | tee artifact/MKSQUASHFS-VERSION.txt
           /usr/bin/unsquashfs -version | tee artifact/UNSQUASHFS-VERSION.txt
+          /usr/bin/qemu-mipsel-static --version | head -1 | tee artifact/QEMU-VERSION.txt
           sha256sum artifact/* > artifact/SHA256SUMS.txt
       - name: Upload tools
         uses: actions/upload-artifact@v4
         with:
-          name: r25-csp25-squashfs-tools-x86_64
+          name: r25-firmware-audit-tools-x86_64
           path: artifact/
           if-no-files-found: error
