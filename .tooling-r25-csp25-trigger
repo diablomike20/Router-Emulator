@@ -1,1 +1,1 @@
-trigger mksquashfs build
+trigger squashfs-tools re-audit build 2
