@@ -65,5 +65,6 @@ jobs:
             ${{ runner.temp }}/RE-qemu-build.log
             ${{ runner.temp }}/RE-qemu-smoke.log
             ${{ runner.temp }}/RE-PROVENANCE.txt
+            ${{ runner.temp }}/rt3883-qemu/build/qemu-system-mipsel
             ${{ runner.temp }}/rt3883-smoke/serial.log
             ${{ runner.temp }}/rt3883-smoke/probe.bin
