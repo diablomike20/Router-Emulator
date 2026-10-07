@@ -23,14 +23,54 @@ _start:
     jal uart_puts
     nop
 
+    /*
+     * GPIO25 belongs to RT3883 bank 24..39: DATA 0xb0000648,
+     * bank bit1.  The old M0 probe incorrectly treated it as bank0 bit25.
+     */
     lui $t0,0xb000
-    ori $t0,$t0,0x0620
+    ori $t0,$t0,0x0648
     lw $t1,0($t0)
-    lui $t2,0x0200
-    and $t1,$t1,$t2
+    andi $t1,$t1,0x0002
     bnez $t1,gpio_fail
     nop
     la $a0,msg_gpio
+    jal uart_puts
+    nop
+
+    /*
+     * Prove GPIO24 switch-reset latch semantics in the same bank:
+     * DIR bit0 output, RESET bit0 drives low, SET bit0 drives high.
+     */
+    lui $s2,0xb000
+    ori $s2,$s2,0x064c
+    li $t0,0x1
+    sw $t0,0($s2)
+
+    lui $s3,0xb000
+    ori $s3,$s3,0x0658
+    sw $t0,0($s3)
+    lui $s4,0xb000
+    ori $s4,$s4,0x0648
+    lw $t1,0($s4)
+    andi $t1,$t1,0x0001
+    bnez $t1,gpio_bank_fail
+    nop
+
+    lui $s3,0xb000
+    ori $s3,$s3,0x0654
+    sw $t0,0($s3)
+    lw $t1,0($s4)
+    andi $t1,$t1,0x0001
+    beqz $t1,gpio_bank_fail
+    nop
+
+    /* Recovery input GPIO25 must remain asserted low. */
+    lw $t1,0($s4)
+    andi $t1,$t1,0x0002
+    bnez $t1,gpio_bank_fail
+    nop
+
+    la $a0,msg_gpio_bank
     jal uart_puts
     nop
 
@@ -124,6 +164,12 @@ gpio_fail:
     nop
     b hang
     nop
+gpio_bank_fail:
+    la $a0,msg_gpio_bank_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 syscfg_fail:
     la $a0,msg_syscfg_fail
     jal uart_puts
@@ -155,6 +201,7 @@ uart_puts:
 .data
 msg_flash: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=PASS\n"
 msg_gpio: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=PASS\n"
+msg_gpio_bank: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=PASS\n"
 msg_syscfg: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
@@ -162,5 +209,6 @@ msg_system_reset: .asciz "RT3883_F9K1103V1_SYSTEM_RESET_GATE=PASS\n"
 msg_pass: .asciz "RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS\n"
 msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
 msg_gpio_fail: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=FAIL\n"
+msg_gpio_bank_fail: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=FAIL\n"
 msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
