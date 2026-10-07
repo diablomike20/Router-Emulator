@@ -94,7 +94,6 @@ _start:
     lui $t0,0x8001
     li $t1,0x4d315253
     sw $t1,0($t0)
-    sync
     li $t1,0x1
     sw $t1,0($s1)
 reset_wait:
