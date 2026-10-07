@@ -17,3 +17,18 @@ has 74Kf but not 74Kc, so M0 temporarily uses 74Kf.
 Next: original U-Boot serial banner/menu; INTCTL/timer; Frame Engine/PDMA plus
 RTL8367R-VB SMI; original HTTP recovery; SPI erase/write; reboot from uploaded
 firmware.
+
+
+## M1 preparation
+
+M1 keeps the M0 direct-entry fidelity boundary but now carries evidence-derived
+F9K1103 bootstrap state: RT3883 500 MHz + DDR2 through SYSCFG0, plus distinct
+system/SPI/Frame-Engine reset semantics.
+
+The exact physical MTD bytes are deliberately not committed. Use
+`scripts/RE-run-exact-f9k1103-v1-rt3883-m1.sh` with the recovered physical
+MTD package to reconstruct the 8 MiB SPI image locally and execute the exact
+Belkin U-Boot payload.
+
+UART from the physical router is not a project requirement. Historical F9K1103
+boot evidence plus exact recovered flash are the current hardware truth inputs.
