@@ -3,6 +3,17 @@
 .text
 .globl _start
 _start:
+    /*
+     * QEMU system reset preserves guest RAM.  Use one scratch word so the
+     * probe can prove that RSTCTRL bit0 really returns execution to the RT3883
+     * reset entry instead of being confused with peripheral reset bits.
+     */
+    lui $t0,0x8001
+    lw $t1,0($t0)
+    li $t2,0x4d315253
+    beq $t1,$t2,after_system_reset
+    nop
+
     lui $t0,0xbc00
     lbu $t1,0($t0)
     li $t2,0x5a
@@ -11,6 +22,7 @@ _start:
     la $a0,msg_flash
     jal uart_puts
     nop
+
     lui $t0,0xb000
     ori $t0,$t0,0x0620
     lw $t1,0($t0)
@@ -21,6 +33,42 @@ _start:
     la $a0,msg_gpio
     jal uart_puts
     nop
+
+    /*
+     * Physical F9K1103 boot evidence: 500 MHz + DDR2.
+     * RT3883 lineage decodes this as SYSCFG0[9:8]=3, bit17=1.
+     */
+    lui $t0,0xb000
+    ori $t0,$t0,0x0010
+    lw $t1,0($t0)
+    li $t2,0x00020300
+    and $t1,$t1,$t2
+    bne $t1,$t2,syscfg_fail
+    nop
+    la $a0,msg_syscfg
+    jal uart_puts
+    nop
+
+    /*
+     * FE reset is bit21.  This write must not reboot the whole machine.
+     */
+    lui $s1,0xb000
+    ori $s1,$s1,0x0034
+    li $t0,0x00200000
+    sw $t0,0($s1)
+    sw $zero,0($s1)
+    la $a0,msg_periph_reset
+    jal uart_puts
+    nop
+
+    /*
+     * SPI reset is bit18.  Exercise it before RDID to prove the controller
+     * reset and the whole-system reset paths are distinct.
+     */
+    li $t0,0x00040000
+    sw $t0,0($s1)
+    sw $zero,0($s1)
+
     lui $s0,0xb000
     ori $s0,$s0,0x0b00
     sw $zero,0x14($s0)
@@ -39,11 +87,32 @@ _start:
     la $a0,msg_spi
     jal uart_puts
     nop
+
+    /*
+     * Exact Belkin reset helper writes literal 1 to 0xb0000034.
+     */
+    lui $t0,0x8001
+    li $t1,0x4d315253
+    sw $t1,0($t0)
+    sync
+    li $t1,0x1
+    sw $t1,0($s1)
+reset_wait:
+    b reset_wait
+    nop
+
+after_system_reset:
+    sw $zero,0($t0)
+    la $a0,msg_system_reset
+    jal uart_puts
+    nop
     la $a0,msg_pass
     jal uart_puts
     nop
-hang: b hang
+hang:
+    b hang
     nop
+
 flash_fail:
     la $a0,msg_flash_fail
     jal uart_puts
@@ -56,12 +125,19 @@ gpio_fail:
     nop
     b hang
     nop
+syscfg_fail:
+    la $a0,msg_syscfg_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 spi_fail:
     la $a0,msg_spi_fail
     jal uart_puts
     nop
     b hang
     nop
+
 uart_puts:
     lui $t8,0xb000
     ori $t8,$t8,0x0c04
@@ -76,11 +152,16 @@ uart_puts:
 2:
     jr $ra
     nop
+
 .data
 msg_flash: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=PASS\n"
 msg_gpio: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=PASS\n"
+msg_syscfg: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=PASS\n"
+msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
-msg_pass: .asciz "RT3883_F9K1103V1_MACHINE_M0_GATE=PASS\n"
+msg_system_reset: .asciz "RT3883_F9K1103V1_SYSTEM_RESET_GATE=PASS\n"
+msg_pass: .asciz "RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS\n"
 msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
 msg_gpio_fail: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=FAIL\n"
+msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
