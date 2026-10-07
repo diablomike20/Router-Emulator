@@ -1,0 +1,109 @@
+name: RE F9K1103 v1 Candidate-15 emulator gate
+
+on:
+  push:
+    branches: [f9k1103-v1-candidate-15-emulator-v1]
+    paths:
+      - 'scripts/RE-*f9k1103-v1-candidate-15*'
+      - 'profiles/f9k1103-v1-candidate-15/**'
+      - '.github/workflows/RE-f9k1103-v1-candidate-15-emulator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  emulator:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: f9k1103-v1-candidate-15-emulator-v1
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-mips qemu-utils squashfs-tools e2fsprogs unzip curl python3 libdigest-sha-perl gh
+          qemu-system-mipsel -cpu help | tee /tmp/RE-qemu-cpus.txt
+          grep -q '74Kf' /tmp/RE-qemu-cpus.txt
+
+      - name: Download exact Candidate-15 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/RE-c15-artifact
+          mkdir -p /tmp/RE-c15-artifact
+          gh api /repos/diablomike20/Belkin-F9K1103-Firmware/actions/artifacts/11474837267/zip > /tmp/RE-c15.zip
+          unzip -q /tmp/RE-c15.zip -d /tmp/RE-c15-artifact
+          FW="$(find /tmp/RE-c15-artifact -type f -name 'RE-F9K1103-CUDY-WR1200E-CANDIDATE-15-BOOTFIRST-sysupgrade.bin' | head -n1)"
+          test -n "$FW"
+          test "$(stat -c %s "$FW")" = 6267492
+          echo '007246db91aa6661d3f2055ae35b3fbcec399ed238202867206e460bbab06e54  '"$FW" | sha256sum -c -
+          cp "$FW" /tmp/RE-F9K1103-V1-CANDIDATE-15.bin
+
+      - name: Script gates
+        run: |
+          set -euo pipefail
+          for f in scripts/RE-*f9k1103-v1-candidate-15*.sh; do bash -n "$f"; done
+          grep -q 'F9K1103_V1_C15_EMU=1' scripts/RE-run.f9k1103-v1-candidate-15.mipsel.sh
+          grep -q -- '-cpu 74Kf' scripts/RE-run.f9k1103-v1-candidate-15.mipsel.sh
+          grep -q '2.4.25-F9K1103-Cudy-C15' profiles/f9k1103-v1-candidate-15/README.md
+
+      - name: Build FirmAE guest image
+        run: |
+          set -euo pipefail
+          chmod +x scripts/RE-*f9k1103-v1-candidate-15*.sh
+          bash scripts/RE-make.f9k1103-v1-candidate-15-emulator.sh /tmp/RE-F9K1103-V1-CANDIDATE-15.bin scratch/f9k1103-v1-candidate-15
+
+      - name: Boot and test Candidate-15 web stack
+        id: gate
+        run: |
+          set -euo pipefail
+          rm -f scratch/f9k1103-v1-candidate-15/qemu.serial.log
+          bash scripts/RE-start.f9k1103-v1-candidate-15.sh scratch/f9k1103-v1-candidate-15/image.raw &
+          pid=$!
+          echo "$pid" > /tmp/RE-f9k1103-v1-c15.pid
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 120); do
+            if curl -fsS --connect-timeout 1 --max-time 2 http://127.0.0.1:18080/luci-static/bootstrap/js/sysauth.js >/dev/null 2>&1; then ready=1; break; fi
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then
+            echo 'F9K1103_V1_C15_TRANSPORT_GATE=FAIL'
+            tail -n 300 scratch/f9k1103-v1-candidate-15/qemu.serial.log || true
+            exit 1
+          fi
+          echo 'F9K1103_V1_C15_TRANSPORT_GATE=PASS'
+          bash scripts/RE-smoke.f9k1103-v1-candidate-15-http.sh /tmp/RE-f9k1103-v1-c15
+          echo 'F9K1103_V1_CANDIDATE15_EMULATOR_GATE=PASS'
+
+      - name: Capture evidence
+        if: always()
+        run: |
+          set +e
+          mkdir -p RE-F9K1103-V1-CANDIDATE-15-EMULATOR-EVIDENCE
+          cp scratch/f9k1103-v1-candidate-15/qemu.serial.log RE-F9K1103-V1-CANDIDATE-15-EMULATOR-EVIDENCE/RE-QEMU-SERIAL.log 2>/dev/null
+          cp /tmp/RE-f9k1103-v1-c15* RE-F9K1103-V1-CANDIDATE-15-EMULATOR-EVIDENCE/ 2>/dev/null
+          cp /tmp/RE-qemu-cpus.txt RE-F9K1103-V1-CANDIDATE-15-EMULATOR-EVIDENCE/ 2>/dev/null
+          {
+            echo "source_commit=$GITHUB_SHA"
+            echo 'hardware=Belkin F9K1103 v1'
+            echo 'firmware=Candidate-15 BOOTFIRST'
+            echo 'firmware_sha256=007246db91aa6661d3f2055ae35b3fbcec399ed238202867206e460bbab06e54'
+            echo 'fidelity=COMPATIBILITY_SHIMMED'
+            echo 'physical_hardware_claim=NO'
+          } > RE-F9K1103-V1-CANDIDATE-15-EMULATOR-EVIDENCE/RE-PROVENANCE.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RE-F9K1103-V1-CANDIDATE-15-EMULATOR-EVIDENCE
+          path: RE-F9K1103-V1-CANDIDATE-15-EMULATOR-EVIDENCE/
+          if-no-files-found: warn
+          compression-level: 0
