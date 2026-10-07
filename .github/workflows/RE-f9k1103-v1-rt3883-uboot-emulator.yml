@@ -38,7 +38,12 @@ jobs:
           {
             echo "hardware=Belkin F9K1103 v1"
             echo "soc=Ralink RT3883"
-            echo "phase=M1_EXACT_UBOOT_PREPARATION"\n            echo "syscfg0_evidence=bits_17_9_8_DDR2_500MHz"\n            echo "system_reset=RSTCTRL_bit0"\n            echo "spi_reset=RSTCTRL_bit18"\n            echo "fe_reset=RSTCTRL_bit21"\n            echo "exact_mtd_fixture=LOCAL_PRIVATE_NOT_IN_REPO"
+            echo "phase=M1_EXACT_UBOOT_PREPARATION"
+            echo "syscfg0_evidence=bits_17_9_8_DDR2_500MHz"
+            echo "system_reset=RSTCTRL_bit0"
+            echo "spi_reset=RSTCTRL_bit18"
+            echo "fe_reset=RSTCTRL_bit21"
+            echo "exact_mtd_fixture=LOCAL_PRIVATE_NOT_IN_REPO"
             echo "qemu_tag=v8.2.10"
             echo "physical_hardware_claim=NO"
             echo "bootrom_fidelity=DIRECT_UBOOT_ENTRY_SHIM"
