@@ -7,8 +7,10 @@ on:
       - 'qemu/f9k1103-v1-rt3883/**'
       - 'scripts/RE-build-qemu-f9k1103-v1-rt3883.sh'
       - 'scripts/RE-smoke-qemu-f9k1103-v1-rt3883.sh'
+      - 'scripts/RE-run-exact-f9k1103-v1-rt3883-m1.sh'
       - 'profiles/f9k1103-v1-rt3883-uboot/**'
       - 'evidence/RE-F9K1103-V1-RT3883-QEMU-SOURCE-TRUTH.md'
+      - 'evidence/RE-F9K1103-V1-RT3883-QEMU-M1-TRUTH.md'
       - '.github/workflows/RE-f9k1103-v1-rt3883-uboot-emulator.yml'
 jobs:
   qemu-rt3883-m1-prep:
