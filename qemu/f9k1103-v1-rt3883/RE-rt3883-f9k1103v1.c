@@ -249,13 +249,23 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     MemoryRegion *sysmem = get_system_memory();
     RT3883F9K1103State *s = g_new0(RT3883F9K1103State, 1);
     RT3883ResetData *reset = g_new0(RT3883ResetData, 1);
+    error_report("RT3883_M0_STAGE=clock_new");
     Clock *cpuclk = clock_new(OBJECT(machine), "cpu-refclk");
     clock_set_hz(cpuclk, 500000000);
+    error_report("RT3883_M0_STAGE=cpu_create type=%s", machine->cpu_type);
     MIPSCPU *cpu = mips_cpu_create_with_clock(machine->cpu_type, cpuclk);
-    reset->cpu = cpu; qemu_register_reset(rt3883_cpu_reset, reset);
-    cpu_mips_irq_init_cpu(cpu); cpu_mips_clock_init(cpu);
+    error_report("RT3883_M0_STAGE=cpu_created");
+    reset->cpu = cpu;
+    error_report("RT3883_M0_STAGE=register_reset");
+    qemu_register_reset(rt3883_cpu_reset, reset);
+    error_report("RT3883_M0_STAGE=irq_init");
+    cpu_mips_irq_init_cpu(cpu);
+    error_report("RT3883_M0_STAGE=cp0_clock_init");
+    cpu_mips_clock_init(cpu);
+    error_report("RT3883_M0_STAGE=ram_map");
     memory_region_add_subregion(sysmem, 0, machine->ram);
 
+    error_report("RT3883_M0_STAGE=soc_mmio");
     memory_region_init_io(&s->soc_mmio, OBJECT(machine), &rt3883_soc_ops, s,
                           "rt3883.soc-mmio", RT3883_SOC_SIZE);
     memory_region_add_subregion(sysmem, RT3883_SOC_BASE, &s->soc_mmio);
@@ -263,6 +273,7 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
                           "rt3883.frame-engine", RT3883_FE_SIZE);
     memory_region_add_subregion(sysmem, RT3883_FE_BASE, &s->fe_mmio);
 
+    error_report("RT3883_M0_STAGE=flash_map");
     memory_region_init_ram(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
                            RT3883_FLASH_SIZE, &error_fatal);
     s->flash = memory_region_get_ram_ptr(&s->flash_mr);
@@ -274,12 +285,14 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     s->soc_regs[0x04 >> 2] = 0x20203338;
     s->soc_regs[PIO_DATA_OFF >> 2] = 0xffffffffU & ~(1U << F9K1103_RESET_GPIO);
 
+    error_report("RT3883_M0_STAGE=serial_init");
     if (serial_hd(0)) {
         qemu_chr_fe_init(&s->chr, serial_hd(0), &error_fatal);
         qemu_chr_fe_set_handlers(&s->chr, rt3883_uart_can_read, rt3883_uart_read,
                                  NULL, NULL, s, NULL, true);
     }
 
+    error_report("RT3883_M0_STAGE=firmware_load");
     if (!machine->firmware) {
         error_report("rt3883-f9k1103v1 requires -bios <raw-u-boot-or-probe.bin>");
         exit(1);
@@ -293,6 +306,7 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
         error_report("cannot load U-Boot/probe '%s'", machine->firmware); exit(1);
     }
     cpu->env.active_tc.PC = RT3883_UBOOT_ENTRY;
+    error_report("RT3883_M0_STAGE=init_done");
 }
 
 static void rt3883_f9k1103v1_machine_init(MachineClass *mc)
