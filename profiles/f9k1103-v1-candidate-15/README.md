@@ -8,6 +8,7 @@ Subject under test:
 - firmware: `RE-F9K1103-CUDY-WR1200E-CANDIDATE-15-BOOTFIRST-sysupgrade.bin`
 - firmware SHA-256: `007246db91aa6661d3f2055ae35b3fbcec399ed238202867206e460bbab06e54`
 - firmware size: `6267492` bytes
+- Candidate ROM version: `2.4.25-F9K1103-Cudy-C15`
 - source lineage: physically boot-proven WIP03 RADIOFIX + WR1200E R62 2.4.25 Cudy application layer
 
 This profile is deliberately named after the real hardware revision. Candidate-15 is a firmware build label, not a router revision.
