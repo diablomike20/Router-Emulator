@@ -1,4 +1,9 @@
 name: RE F9K1103 v1 RT3883 U-Boot emulator M1
+
+concurrency:
+  group: re-f9k1103-rt3883-m1-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
