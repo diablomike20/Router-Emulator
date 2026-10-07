@@ -111,20 +111,51 @@ _start:
 
     lui $s0,0xb000
     ori $s0,$s0,0x0b00
+    /*
+     * Exercise SPI exactly like the legacy RT3883 driver: CTL action bits
+     * are set with read-modify-write and must self-clear in hardware.
+     * This catches the stale-STARTWR bug which allowed RDID but broke the
+     * very next RDSR transaction in the exact Belkin U-Boot.
+     */
     sw $zero,0x14($s0)
     li $t0,0x9f
     sw $t0,0x20($s0)
-    li $t0,0x04
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x04
     sw $t0,0x14($s0)
-    li $t0,0x02
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x02
     sw $t0,0x14($s0)
     lw $t1,0x20($s0)
     li $t2,0xc2
     bne $t1,$t2,spi_fail
     nop
-    li $t0,0x01
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x01
     sw $t0,0x14($s0)
     la $a0,msg_spi
+    jal uart_puts
+    nop
+
+    /* Immediately follow RDID with RDSR; expected idle status is 0x00. */
+    lw $t0,0x14($s0)
+    andi $t0,$t0,0xfffe
+    sw $t0,0x14($s0)
+    li $t0,0x05
+    sw $t0,0x20($s0)
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x04
+    sw $t0,0x14($s0)
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x02
+    sw $t0,0x14($s0)
+    lw $t1,0x20($s0)
+    bnez $t1,spi_rdsr_fail
+    nop
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x01
+    sw $t0,0x14($s0)
+    la $a0,msg_spi_rdsr
     jal uart_puts
     nop
 
@@ -176,6 +207,12 @@ syscfg_fail:
     nop
     b hang
     nop
+spi_rdsr_fail:
+    la $a0,msg_spi_rdsr_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 spi_fail:
     la $a0,msg_spi_fail
     jal uart_puts
@@ -205,6 +242,7 @@ msg_gpio_bank: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=PASS\n"
 msg_syscfg: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
+msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
 msg_system_reset: .asciz "RT3883_F9K1103V1_SYSTEM_RESET_GATE=PASS\n"
 msg_pass: .asciz "RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS\n"
 msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
@@ -212,3 +250,4 @@ msg_gpio_fail: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=FAIL\n"
 msg_gpio_bank_fail: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=FAIL\n"
 msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
+msg_spi_rdsr_fail: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=FAIL\n"
