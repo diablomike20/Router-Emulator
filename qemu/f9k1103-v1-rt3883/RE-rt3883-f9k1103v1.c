@@ -38,8 +38,17 @@
 #define UART_LSR_DR              0x01
 #define UART_LSR_TDRQ            0x20
 #define UART_LSR_TEMT            0x40
-#define PIO_DATA_OFF             0x0620
+#define PIO_DATA0_OFF            0x0620
+#define PIO_DIR0_OFF             0x0624
+#define PIO_SET0_OFF             0x062c
+#define PIO_RESET0_OFF           0x0630
+#define PIO_DATA24_OFF           0x0648
+#define PIO_DIR24_OFF            0x064c
+#define PIO_SET24_OFF            0x0654
+#define PIO_RESET24_OFF          0x0658
+#define F9K1103_SWITCH_RST_GPIO  24
 #define F9K1103_RESET_GPIO       25
+#define F9K1103_WPS_GPIO         26
 
 #define SYSCTL_SYSCFG0_OFF       0x0010
 #define SYSCTL_RSTCTRL_OFF       0x0034
@@ -182,8 +191,71 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     s->soc_regs[0x00 >> 2] = 0x38335452;
     s->soc_regs[0x04 >> 2] = 0x20203338;
     s->soc_regs[SYSCTL_SYSCFG0_OFF >> 2] = F9K1103_SYSCFG0_EVIDENCE;
-    s->soc_regs[PIO_DATA_OFF >> 2] =
-        0xffffffffU & ~(1U << F9K1103_RESET_GPIO);
+    /*
+     * Keep all output latches high at reset.  Active-low button state is
+     * supplied by rt3883_pio_read_data() only while the pins are inputs.
+     */
+    s->soc_regs[PIO_DATA0_OFF >> 2] = 0xffffffffU;
+    s->soc_regs[PIO_DATA24_OFF >> 2] = 0xffffffffU;
+}
+
+static uint32_t rt3883_pio_read_data(RT3883F9K1103State *s,
+                                        hwaddr data_off, hwaddr dir_off)
+{
+    uint32_t data = s->soc_regs[data_off >> 2];
+    uint32_t dir = s->soc_regs[dir_off >> 2];
+
+    if (data_off == PIO_DATA24_OFF) {
+        /*
+         * RT3883 GPIO24..39 use their own bank.  F9K1103 RESET is GPIO25
+         * (bank bit1) and WPS is GPIO26 (bank bit2), both active-low.
+         * M1 deliberately holds RESET asserted to enter recovery while WPS
+         * remains released.  External input only overrides pins configured
+         * as inputs; output pins retain their latch state.
+         */
+        const uint32_t reset_bit =
+            1U << (F9K1103_RESET_GPIO - F9K1103_SWITCH_RST_GPIO);
+        const uint32_t wps_bit =
+            1U << (F9K1103_WPS_GPIO - F9K1103_SWITCH_RST_GPIO);
+
+        if (!(dir & reset_bit)) {
+            data &= ~reset_bit;
+        }
+        if (!(dir & wps_bit)) {
+            data |= wps_bit;
+        }
+    }
+    return data;
+}
+
+static bool rt3883_pio_write(RT3883F9K1103State *s, hwaddr addr, uint32_t v)
+{
+    switch (addr) {
+    case PIO_DATA0_OFF:
+    case PIO_DIR0_OFF:
+    case PIO_DATA24_OFF:
+    case PIO_DIR24_OFF:
+        s->soc_regs[addr >> 2] = v;
+        return true;
+    case PIO_SET0_OFF:
+        s->soc_regs[PIO_DATA0_OFF >> 2] |= v;
+        s->soc_regs[addr >> 2] = v;
+        return true;
+    case PIO_RESET0_OFF:
+        s->soc_regs[PIO_DATA0_OFF >> 2] &= ~v;
+        s->soc_regs[addr >> 2] = v;
+        return true;
+    case PIO_SET24_OFF:
+        s->soc_regs[PIO_DATA24_OFF >> 2] |= v;
+        s->soc_regs[addr >> 2] = v;
+        return true;
+    case PIO_RESET24_OFF:
+        s->soc_regs[PIO_DATA24_OFF >> 2] &= ~v;
+        s->soc_regs[addr >> 2] = v;
+        return true;
+    default:
+        return false;
+    }
 }
 
 static uint64_t rt3883_soc_read(void *opaque, hwaddr addr, unsigned size)
@@ -203,8 +275,10 @@ static uint64_t rt3883_soc_read(void *opaque, hwaddr addr, unsigned size)
             return 0;
         }
     }
-    if (addr == PIO_DATA_OFF)
-        return s->soc_regs[addr >> 2] & ~(1U << F9K1103_RESET_GPIO);
+    if (addr == PIO_DATA0_OFF)
+        return rt3883_pio_read_data(s, PIO_DATA0_OFF, PIO_DIR0_OFF);
+    if (addr == PIO_DATA24_OFF)
+        return rt3883_pio_read_data(s, PIO_DATA24_OFF, PIO_DIR24_OFF);
     if (addr >= SPI_OFF && addr < SPI_OFF + 0x100) {
         hwaddr r = addr - SPI_OFF;
         if (r == SPI_STAT) return 0;
@@ -218,6 +292,10 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
 {
     RT3883F9K1103State *s = opaque;
     uint32_t v = val;
+
+    if (rt3883_pio_write(s, addr, v)) {
+        return;
+    }
 
     if ((addr >> 2) < ARRAY_SIZE(s->soc_regs)) {
         s->soc_regs[addr >> 2] = v;
