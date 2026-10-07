@@ -1,21 +1,21 @@
-# Belkin F9K1103 v1 — Cudy Candidate-15 emulator profile
+# Belkin F9K1103 v1 — Cudy Candidate-15R2 emulator profile
 
 Branch: `f9k1103-v1-candidate-15-emulator-v1`
 
 Subject under test:
 
 - hardware target: **Belkin F9K1103 v1 / N750 DB**
-- firmware: `RE-F9K1103-CUDY-WR1200E-CANDIDATE-15-BOOTFIRST-sysupgrade.bin`
-- firmware SHA-256: `007246db91aa6661d3f2055ae35b3fbcec399ed238202867206e460bbab06e54`
+- firmware: `RE-F9K1103-CUDY-WR1200E-CANDIDATE-15R2-BOOTFIRST-sysupgrade.bin`
+- firmware SHA-256: `8401d09c91fb94ff17f6f84afe786167e62db3721bc8a0419b6a80e41ad45937`
 - firmware size: `6267492` bytes
-- Candidate ROM version: `2.4.25-F9K1103-Cudy-C15`
+- Candidate ROM version: `2.4.25-F9K1103-Cudy-C15R2`
 - source lineage: physically boot-proven WIP03 RADIOFIX + WR1200E R62 2.4.25 Cudy application layer
 
-This profile is deliberately named after the real hardware revision. Candidate-15 is a firmware build label, not a router revision.
+This profile is deliberately named after the real hardware revision. Candidate-15R2 is a firmware build label, not a router revision.
 
 ## Purpose
 
-Use FirmAE/QEMU to test the Candidate-15 userspace and Cudy web stack before another physical flash.
+Use FirmAE/QEMU to test the Candidate-15R2 userspace and Cudy web stack before another physical flash.
 
 Primary emulator gates:
 
