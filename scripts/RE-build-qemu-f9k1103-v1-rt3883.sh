@@ -23,7 +23,7 @@ rm -rf "$QEMU_BUILD"; mkdir -p "$QEMU_BUILD"; cd "$QEMU_BUILD"
 "$QEMU_SRC/configure" \
   --target-list=mipsel-softmmu \
   --disable-werror \
-  --disable-jpeg \
+  --disable-vnc \
   --disable-png \
   --disable-sdl \
   --disable-gtk \
