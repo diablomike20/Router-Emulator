@@ -19,7 +19,7 @@ used=struct.unpack_from('<Q',b,off+40)[0]
 if off+used>len(b): raise SystemExit('invalid SquashFS bytes_used')
 Path(dst).write_bytes(b[off:off+used]); print(f'squashfs_offset={off} squashfs_bytes={used}')
 PY
-rm -rf "$DONOR" "$GUEST"; mkdir -p "$DONOR"
+rm -rf "$DONOR" "$GUEST"
 if [ "$(id -u)" -eq 0 ]; then unsquashfs -no-progress -d "$DONOR" "$SQUASH" >/dev/null; elif command -v sudo >/dev/null 2>&1; then sudo unsquashfs -no-progress -d "$DONOR" "$SQUASH" >/dev/null; sudo chown -R "$(id -u):$(id -g)" "$DONOR"; else set +e; unsquashfs -no-progress -d "$DONOR" "$SQUASH" >/tmp/RE-f9k1103-c15-unsquashfs.log 2>&1; rc=$?; set -e; [ "$rc" -eq 0 ] || echo "WARN unsquashfs rc=$rc"; fi
 for required in sbin/procd bin/busybox lib/ramips.sh etc/rom_version usr/lib/lua/luci/dispatcher.lua; do [ -e "$DONOR/$required" ] || { echo "Extracted Candidate-15 missing /$required"; exit 1; }; done
 mkdir -p "$GUEST"; cp -a "$DONOR"/. "$GUEST"/
