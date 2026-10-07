@@ -1,8 +1,8 @@
-name: RE F9K1103 v1 RT3883 U-Boot emulator
+name: RE F9K1103 v1 RT3883 U-Boot emulator M1
 on:
   workflow_dispatch:
   push:
-    branches: [f9k1103-v1-rt3883-uboot-emulator-v1]
+    branches: [f9k1103-v1-rt3883-uboot-emulator-m1]
     paths:
       - 'qemu/f9k1103-v1-rt3883/**'
       - 'scripts/RE-build-qemu-f9k1103-v1-rt3883.sh'
@@ -11,7 +11,7 @@ on:
       - 'evidence/RE-F9K1103-V1-RT3883-QEMU-SOURCE-TRUTH.md'
       - '.github/workflows/RE-f9k1103-v1-rt3883-uboot-emulator.yml'
 jobs:
-  qemu-rt3883-m0:
+  qemu-rt3883-m1-prep:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
@@ -25,7 +25,7 @@ jobs:
           set -o pipefail
           chmod +x scripts/RE-build-qemu-f9k1103-v1-rt3883.sh
           scripts/RE-build-qemu-f9k1103-v1-rt3883.sh "$RUNNER_TEMP/rt3883-qemu" | tee "$RUNNER_TEMP/RE-qemu-build.log"
-      - name: Run RT3883 machine M0 smoke gates
+      - name: Run RT3883 machine M1-prep smoke gates
         run: |
           set -o pipefail
           chmod +x scripts/RE-smoke-qemu-f9k1103-v1-rt3883.sh
@@ -36,18 +36,18 @@ jobs:
           {
             echo "hardware=Belkin F9K1103 v1"
             echo "soc=Ralink RT3883"
-            echo "phase=M0_CUSTOM_QEMU_MACHINE"
+            echo "phase=M1_EXACT_UBOOT_PREPARATION"\n            echo "syscfg0_evidence=bits_17_9_8_DDR2_500MHz"\n            echo "system_reset=RSTCTRL_bit0"\n            echo "spi_reset=RSTCTRL_bit18"\n            echo "fe_reset=RSTCTRL_bit21"\n            echo "exact_mtd_fixture=LOCAL_PRIVATE_NOT_IN_REPO"
             echo "qemu_tag=v8.2.10"
             echo "physical_hardware_claim=NO"
             echo "bootrom_fidelity=DIRECT_UBOOT_ENTRY_SHIM"
-            echo "cpu_fidelity=QEMU_74KF_TEMPORARY_FOR_74KC"
+            echo "cpu_fidelity=QEMU_74KF_TEMPORARY__PHYSICAL_PRID_0001974C_CACHE_GEOMETRY_KNOWN"
             echo "source_sha=$GITHUB_SHA"
           } > "$RUNNER_TEMP/RE-PROVENANCE.txt"
-      - name: Upload M0 evidence
+      - name: Upload M1-prep evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: RE-F9K1103-V1-RT3883-QEMU-M0-EVIDENCE
+          name: RE-F9K1103-V1-RT3883-QEMU-M1-PREP-EVIDENCE
           retention-days: 90
           path: |
             ${{ runner.temp }}/RE-qemu-build.log
