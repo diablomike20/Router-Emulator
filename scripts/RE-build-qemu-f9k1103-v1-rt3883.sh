@@ -20,7 +20,14 @@ if line not in s:
     p.write_text(s.replace(anchor,anchor+"\n"+line,1))
 PY
 rm -rf "$QEMU_BUILD"; mkdir -p "$QEMU_BUILD"; cd "$QEMU_BUILD"
-"$QEMU_SRC/configure" --target-list=mipsel-softmmu --disable-werror
+"$QEMU_SRC/configure" \
+  --target-list=mipsel-softmmu \
+  --disable-werror \
+  --disable-jpeg \
+  --disable-png \
+  --disable-sdl \
+  --disable-gtk \
+  --disable-opengl
 ninja qemu-system-mipsel
 BIN="$QEMU_BUILD/qemu-system-mipsel"
 "$BIN" -M help | grep -q 'rt3883-f9k1103v1'
