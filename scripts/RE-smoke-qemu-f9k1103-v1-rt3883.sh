@@ -5,7 +5,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"; QEMU="$1"; WORK="$2"; mkdir -p "$WORK"
 AS="${CROSS_COMPILE:-mipsel-linux-gnu-}as"; LD="${CROSS_COMPILE:-mipsel-linux-gnu-}ld"; OBJCOPY="${CROSS_COMPILE:-mipsel-linux-gnu-}objcopy"
 "$AS" -32 -o "$WORK/probe.o" "$ROOT/qemu/f9k1103-v1-rt3883/RE-rt3883-probe.S"
 "$LD" -m elf32ltsmip -Ttext 0x80200000 -e _start -o "$WORK/probe.elf" "$WORK/probe.o"
-"$OBJCOPY" -O binary --change-addresses=-0x80200000 "$WORK/probe.elf" "$WORK/probe.bin"
+"$OBJCOPY" -O binary -j .text -j .rodata -j .data "$WORK/probe.elf" "$WORK/probe.bin"
+PROBE_SIZE="$(stat -c %s "$WORK/probe.bin")"
+[ "$PROBE_SIZE" -gt 0 ] && [ "$PROBE_SIZE" -le 196608 ] || { echo "invalid compact probe size: $PROBE_SIZE" >&2; exit 1; }
+echo "RT3883_F9K1103V1_PROBE_SIZE=$PROBE_SIZE"
 python3 - "$WORK/flash.bin" <<'PY'
 from pathlib import Path
 import sys
