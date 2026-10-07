@@ -274,8 +274,8 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_add_subregion(sysmem, RT3883_FE_BASE, &s->fe_mmio);
 
     error_report("RT3883_M0_STAGE=flash_map");
-    memory_region_init_ram(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
-                           RT3883_FLASH_SIZE, &error_fatal);
+    memory_region_init_ram_nomigrate(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
+                                     RT3883_FLASH_SIZE, &error_fatal);
     s->flash = memory_region_get_ram_ptr(&s->flash_mr);
     memset(s->flash, 0xff, RT3883_FLASH_SIZE);
     memory_region_add_subregion(sysmem, RT3883_FLASH_BASE, &s->flash_mr);
