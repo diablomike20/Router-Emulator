@@ -15,6 +15,8 @@
 #include "hw/loader.h"
 #include "hw/mips/mips.h"
 #include "sysemu/reset.h"
+#include "sysemu/sysemu.h"
+#include "target/mips/cpu.h"
 
 #define RT3883_RAM_SIZE          (64 * MiB)
 #define RT3883_SOC_BASE          0x10000000ULL
@@ -249,7 +251,7 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     RT3883ResetData *reset = g_new0(RT3883ResetData, 1);
     Clock *cpuclk = clock_new(OBJECT(machine), "cpu-refclk");
     clock_set_hz(cpuclk, 500000000);
-    MIPSCPU *cpu = mips_cpu_create_with_clock(machine->cpu_type, cpuclk);
+    MIPSCPU *cpu = mips_cpu_create_with_clock(machine->cpu_type, cpuclk, false);
     reset->cpu = cpu; qemu_register_reset(rt3883_cpu_reset, reset);
     cpu_mips_irq_init_cpu(cpu); cpu_mips_clock_init(cpu);
     memory_region_add_subregion(sysmem, 0, machine->ram);
