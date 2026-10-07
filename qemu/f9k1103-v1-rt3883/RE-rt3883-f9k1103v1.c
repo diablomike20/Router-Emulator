@@ -3,7 +3,8 @@
  *
  * M0: 64 MiB RAM, 74K-family CPU, RT3883 MMIO, UART-lite, recovery GPIO25,
  * 8 MiB SPI NOR, legacy SPI subset, direct U-Boot entry at 0x80200000.
- * Direct entry is a compatibility shim until the internal 16 KiB BootROM is recovered.
+ * Direct entry remains an explicit compatibility shim.  M1 adds evidence-derived
+ * bootstrap SYSCTL state and separates full-system reset from SPI/FE resets.
  */
 #include "qemu/osdep.h"
 #include "qapi/error.h"
@@ -15,6 +16,7 @@
 #include "hw/loader.h"
 #include "hw/mips/mips.h"
 #include "sysemu/reset.h"
+#include "sysemu/runstate.h"
 #include "sysemu/sysemu.h"
 #include "target/mips/cpu.h"
 
@@ -38,6 +40,20 @@
 #define UART_LSR_TEMT            0x40
 #define PIO_DATA_OFF             0x0620
 #define F9K1103_RESET_GPIO       25
+
+#define SYSCTL_SYSCFG0_OFF       0x0010
+#define SYSCTL_RSTCTRL_OFF       0x0034
+#define SYSCTL_RSTCTRL_SYS_RST   (1U << 0)
+#define SYSCTL_RSTCTRL_SPI_RST   (1U << 18)
+#define SYSCTL_RSTCTRL_FE_RST    (1U << 21)
+
+/*
+ * Exact F9K1103 v1 boot evidence reports RT3883 at 500 MHz with DDR2.
+ * The RT3883 MediaTek lineage decodes that as SYSCFG0[9:8] = 3 and
+ * SYSCFG0[17] = 1.  Keep the unknown strap bits zero rather than inventing
+ * values which have not been recovered from the physical unit.
+ */
+#define F9K1103_SYSCFG0_EVIDENCE ((3U << 8) | (1U << 17))
 #define SPI_OFF                  0x0b00
 #define SPI_STAT                 0x00
 #define SPI_CTL                  0x14
@@ -67,7 +83,10 @@ typedef struct RT3883F9K1103State {
     bool spi_cs_low, spi_wel;
 } RT3883F9K1103State;
 
-typedef struct RT3883ResetData { MIPSCPU *cpu; } RT3883ResetData;
+typedef struct RT3883ResetData {
+    MIPSCPU *cpu;
+    RT3883F9K1103State *s;
+} RT3883ResetData;
 
 static bool uart_rx_empty(RT3883F9K1103State *s)
 { return s->uart_rx_r == s->uart_rx_w; }
@@ -139,6 +158,34 @@ static uint8_t rt3883_spi_read_byte(RT3883F9K1103State *s)
     }
 }
 
+static void rt3883_spi_controller_reset(RT3883F9K1103State *s)
+{
+    s->spi_data = 0xff;
+    s->spi_cs_low = false;
+    s->spi_wel = false;
+    rt3883_spi_reset_transaction(s);
+}
+
+static void rt3883_fe_reset(RT3883F9K1103State *s)
+{
+    memset(s->fe_regs, 0, sizeof(s->fe_regs));
+}
+
+static void rt3883_device_reset_state(RT3883F9K1103State *s)
+{
+    memset(s->soc_regs, 0, sizeof(s->soc_regs));
+    rt3883_fe_reset(s);
+    s->uart_rx_r = s->uart_rx_w = 0;
+    rt3883_spi_controller_reset(s);
+
+    /* RT3883 / F9K1103 source + physical boot evidence. */
+    s->soc_regs[0x00 >> 2] = 0x38335452;
+    s->soc_regs[0x04 >> 2] = 0x20203338;
+    s->soc_regs[SYSCTL_SYSCFG0_OFF >> 2] = F9K1103_SYSCFG0_EVIDENCE;
+    s->soc_regs[PIO_DATA_OFF >> 2] =
+        0xffffffffU & ~(1U << F9K1103_RESET_GPIO);
+}
+
 static uint64_t rt3883_soc_read(void *opaque, hwaddr addr, unsigned size)
 {
     RT3883F9K1103State *s = opaque;
@@ -171,7 +218,29 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
 {
     RT3883F9K1103State *s = opaque;
     uint32_t v = val;
-    if ((addr >> 2) < ARRAY_SIZE(s->soc_regs)) s->soc_regs[addr >> 2] = v;
+
+    if ((addr >> 2) < ARRAY_SIZE(s->soc_regs)) {
+        s->soc_regs[addr >> 2] = v;
+    }
+
+    if (addr == SYSCTL_RSTCTRL_OFF) {
+        /*
+         * RT3883 RSTCTRL is shared by system and peripheral resets.
+         * The exact Belkin U-Boot toggles SPI/FE reset bits during init;
+         * those must never be mistaken for a whole-machine reset.
+         */
+        if (v & SYSCTL_RSTCTRL_SPI_RST) {
+            rt3883_spi_controller_reset(s);
+        }
+        if (v & SYSCTL_RSTCTRL_FE_RST) {
+            rt3883_fe_reset(s);
+        }
+        if (v & SYSCTL_RSTCTRL_SYS_RST) {
+            qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
+        }
+        return;
+    }
+
     if (addr == UARTL_OFF + UART_TBR) {
         uint8_t ch = v;
         if (qemu_chr_fe_backend_connected(&s->chr))
@@ -225,7 +294,9 @@ static void rt3883_cpu_reset(void *opaque)
 {
     RT3883ResetData *r = opaque;
     CPUMIPSState *env = &r->cpu->env;
+
     cpu_reset(CPU(r->cpu));
+    rt3883_device_reset_state(r->s);
     env->active_tc.PC = RT3883_UBOOT_ENTRY;
 }
 
@@ -249,23 +320,24 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     MemoryRegion *sysmem = get_system_memory();
     RT3883F9K1103State *s = g_new0(RT3883F9K1103State, 1);
     RT3883ResetData *reset = g_new0(RT3883ResetData, 1);
-    error_report("RT3883_M0_STAGE=clock_new");
+    error_report("RT3883_M1_STAGE=clock_new");
     Clock *cpuclk = clock_new(OBJECT(machine), "cpu-refclk");
     clock_set_hz(cpuclk, 500000000);
-    error_report("RT3883_M0_STAGE=cpu_create type=%s", machine->cpu_type);
+    error_report("RT3883_M1_STAGE=cpu_create type=%s", machine->cpu_type);
     MIPSCPU *cpu = mips_cpu_create_with_clock(machine->cpu_type, cpuclk);
-    error_report("RT3883_M0_STAGE=cpu_created");
+    error_report("RT3883_M1_STAGE=cpu_created");
     reset->cpu = cpu;
-    error_report("RT3883_M0_STAGE=register_reset");
+    reset->s = s;
+    error_report("RT3883_M1_STAGE=register_reset");
     qemu_register_reset(rt3883_cpu_reset, reset);
-    error_report("RT3883_M0_STAGE=irq_init");
+    error_report("RT3883_M1_STAGE=irq_init");
     cpu_mips_irq_init_cpu(cpu);
-    error_report("RT3883_M0_STAGE=cp0_clock_init");
+    error_report("RT3883_M1_STAGE=cp0_clock_init");
     cpu_mips_clock_init(cpu);
-    error_report("RT3883_M0_STAGE=ram_map");
+    error_report("RT3883_M1_STAGE=ram_map");
     memory_region_add_subregion(sysmem, 0, machine->ram);
 
-    error_report("RT3883_M0_STAGE=soc_mmio");
+    error_report("RT3883_M1_STAGE=soc_mmio");
     memory_region_init_io(&s->soc_mmio, OBJECT(machine), &rt3883_soc_ops, s,
                           "rt3883.soc-mmio", RT3883_SOC_SIZE);
     memory_region_add_subregion(sysmem, RT3883_SOC_BASE, &s->soc_mmio);
@@ -273,7 +345,7 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
                           "rt3883.frame-engine", RT3883_FE_SIZE);
     memory_region_add_subregion(sysmem, RT3883_FE_BASE, &s->fe_mmio);
 
-    error_report("RT3883_M0_STAGE=flash_map");
+    error_report("RT3883_M1_STAGE=flash_map");
     memory_region_init_ram_nomigrate(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
                                      RT3883_FLASH_SIZE, &error_fatal);
     s->flash = memory_region_get_ram_ptr(&s->flash_mr);
@@ -281,18 +353,16 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_add_subregion(sysmem, RT3883_FLASH_BASE, &s->flash_mr);
     rt3883_preload_flash(s, machine->kernel_filename);
 
-    s->soc_regs[0x00 >> 2] = 0x38335452;
-    s->soc_regs[0x04 >> 2] = 0x20203338;
-    s->soc_regs[PIO_DATA_OFF >> 2] = 0xffffffffU & ~(1U << F9K1103_RESET_GPIO);
+    rt3883_device_reset_state(s);
 
-    error_report("RT3883_M0_STAGE=serial_init");
+    error_report("RT3883_M1_STAGE=serial_init");
     if (serial_hd(0)) {
         qemu_chr_fe_init(&s->chr, serial_hd(0), &error_fatal);
         qemu_chr_fe_set_handlers(&s->chr, rt3883_uart_can_read, rt3883_uart_read,
                                  NULL, NULL, s, NULL, true);
     }
 
-    error_report("RT3883_M0_STAGE=firmware_load");
+    error_report("RT3883_M1_STAGE=firmware_load");
     if (!machine->firmware) {
         error_report("rt3883-f9k1103v1 requires -bios <raw-u-boot-or-probe.bin>");
         exit(1);
@@ -306,7 +376,7 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
         error_report("cannot load U-Boot/probe '%s'", machine->firmware); exit(1);
     }
     cpu->env.active_tc.PC = RT3883_UBOOT_ENTRY;
-    error_report("RT3883_M0_STAGE=init_done");
+    error_report("RT3883_M1_STAGE=init_done");
 }
 
 static void rt3883_f9k1103v1_machine_init(MachineClass *mc)
