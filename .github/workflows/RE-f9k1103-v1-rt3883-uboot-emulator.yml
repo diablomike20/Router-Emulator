@@ -22,10 +22,12 @@ jobs:
           sudo apt-get install -y build-essential git ninja-build pkg-config python3 python3-venv libglib2.0-dev libpixman-1-dev zlib1g-dev gcc-mipsel-linux-gnu binutils-mipsel-linux-gnu
       - name: Build custom QEMU RT3883 machine
         run: |
+          set -o pipefail
           chmod +x scripts/RE-build-qemu-f9k1103-v1-rt3883.sh
           scripts/RE-build-qemu-f9k1103-v1-rt3883.sh "$RUNNER_TEMP/rt3883-qemu" | tee "$RUNNER_TEMP/RE-qemu-build.log"
       - name: Run RT3883 machine M0 smoke gates
         run: |
+          set -o pipefail
           chmod +x scripts/RE-smoke-qemu-f9k1103-v1-rt3883.sh
           scripts/RE-smoke-qemu-f9k1103-v1-rt3883.sh "$RUNNER_TEMP/rt3883-qemu/build/qemu-system-mipsel" "$RUNNER_TEMP/rt3883-smoke" | tee "$RUNNER_TEMP/RE-qemu-smoke.log"
       - name: Build provenance
