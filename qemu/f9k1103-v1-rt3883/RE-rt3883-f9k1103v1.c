@@ -340,6 +340,16 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
                 if (s->spi_cmd == SPI_CMD_PP) s->spi_wel = false;
                 rt3883_spi_reset_transaction(s);
             }
+
+            /*
+             * RT3883 legacy STARTWR/STARTRD are command strobes, not
+             * persistent latch bits.  Real U-Boot drives them through
+             * ra_or(), so leaving them set corrupts the next CS transaction:
+             * a stale STARTWR is replayed before the next opcode and RDSR
+             * becomes 0xff.  Model the hardware self-clear explicitly.
+             */
+            s->soc_regs[addr >> 2] =
+                v & ~(SPI_CTL_STARTWR | SPI_CTL_STARTRD);
         }
     }
 }
