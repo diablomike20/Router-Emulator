@@ -123,6 +123,21 @@
  */
 #define WMAC_MAC_CSR0            0x1000
 #define WMAC_MAC_CSR0_RT3883     0x38830400U
+#define WMAC_BBP_CSR_CFG         0x101c
+#define WMAC_BBP_VALUE_MASK      0x000000ffU
+#define WMAC_BBP_REGNUM_MASK     0x0000ff00U
+#define WMAC_BBP_READ_CONTROL    0x00010000U
+#define WMAC_BBP_BUSY            0x00020000U
+#define WMAC_BBP_RW_MODE         0x00080000U
+
+/*
+ * BBP_R0 is a read-only BBP version/status register.  RT3883 vendor and
+ * rt2800 sources only require it to become neither 0x00 nor 0xff before
+ * initialization proceeds; an exact F9K1103 reset value has not yet been
+ * recovered.  Keep this explicit compatibility sentinel separate from
+ * evidence-derived register values.
+ */
+#define WMAC_BBP0_READY_SENTINEL 0x01U
 
 #define TYPE_RT3883_EHCI "rt3883-ehci-usb"
 
@@ -166,6 +181,7 @@ typedef struct RT3883F9K1103State {
     uint32_t fe_regs[RT3883_FE_SIZE / 4];
     uint32_t pci_regs[RT3883_PCI_SIZE / 4];
     uint32_t wmac_regs[RT3883_WMAC_SIZE / 4];
+    uint8_t wmac_bbp[256];
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -282,13 +298,15 @@ static void rt3883_pci_reset(RT3883F9K1103State *s)
 static void rt3883_wmac_reset(RT3883F9K1103State *s)
 {
     memset(s->wmac_regs, 0, sizeof(s->wmac_regs));
+    memset(s->wmac_bbp, 0, sizeof(s->wmac_bbp));
 
     /*
-     * Probe identity only.  Do not fabricate RF/BBP completion state here;
-     * later exact Linux execution determines which registers need real
-     * device semantics.
+     * MAC identity is evidence-derived.  BBP0 is deliberately only a
+     * compatibility-ready sentinel: exact RT3883/F9K1103 BBP0 reset value
+     * remains SOURCE_GAP, while the indirect-access protocol is source known.
      */
     s->wmac_regs[WMAC_MAC_CSR0 >> 2] = WMAC_MAC_CSR0_RT3883;
+    s->wmac_bbp[0] = WMAC_BBP0_READY_SENTINEL;
 }
 
 static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
@@ -758,9 +776,36 @@ static void rt3883_wmac_write(void *opaque, hwaddr addr, uint64_t val,
                               unsigned size)
 {
     RT3883F9K1103State *s = opaque;
+    uint32_t v = (uint32_t)val;
+
+    if (addr == WMAC_BBP_CSR_CFG && (v & WMAC_BBP_BUSY)) {
+        unsigned regnum = (v & WMAC_BBP_REGNUM_MASK) >> 8;
+
+        /*
+         * RT2800/RT3883 BBP indirect engine:
+         *   BUSY=1 kicks the access;
+         *   READ_CONTROL selects read versus write;
+         *   hardware completes the byte transaction and self-clears BUSY.
+         *
+         * M1 completes synchronously.  Preserve command metadata for guest
+         * observability, but return BUSY clear exactly as the driver polls.
+         */
+        if (v & WMAC_BBP_READ_CONTROL) {
+            v &= ~(WMAC_BBP_BUSY | WMAC_BBP_VALUE_MASK);
+            v |= s->wmac_bbp[regnum];
+        } else {
+            if (regnum != 0) {
+                s->wmac_bbp[regnum] = v & WMAC_BBP_VALUE_MASK;
+            }
+            v &= ~WMAC_BBP_BUSY;
+        }
+
+        s->wmac_regs[addr >> 2] = v;
+        return;
+    }
 
     if ((addr >> 2) < ARRAY_SIZE(s->wmac_regs)) {
-        s->wmac_regs[addr >> 2] = (uint32_t)val;
+        s->wmac_regs[addr >> 2] = v;
     }
 }
 
