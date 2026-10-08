@@ -144,6 +144,14 @@ OpenWrt bootlog confirms:
 
 This donor log independently validates the emulator's current RT3883 identity, RF3853 WMAC path, FE IRQ5 wiring, SPI layout, cache geometry target and RTL8367R-VB identity.
 
+OpenWrt support-lineage evidence:
+- initial support commit: `f2c83532f92c5fa43165e1c5a3cd7f5cf4e9e3b3`
+- the commit deliberately split the shared hardware description into `F9K110x.dtsi`
+- maintainer note explicitly says this was done "to prepare for a possible F9K1103 patch"
+- shared source contract includes RT3883, exact 8 MiB partition map, fixed 1G RGMII, WMAC EEPROM at factory+0, PCI RT3091 EEPROM at factory+0x8000, EHCI/OHCI, and the stock image identity `N750F9K1103VB`
+- classification: `SOURCE_VERIFIED_SHARED_F9K110X_LINEAGE`
+
+
 ## Fidelity boundary
 
 - BootROM: `DIRECT_UBOOT_ENTRY_SHIM`
