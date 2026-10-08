@@ -15,6 +15,11 @@
 #include "hw/clock.h"
 #include "hw/loader.h"
 #include "hw/mips/mips.h"
+#include "hw/qdev-properties.h"
+#include "hw/sysbus.h"
+#include "hw/usb/hcd-ehci.h"
+#include "hw/usb/hcd-ohci.h"
+#include "qemu/module.h"
 #include "sysemu/reset.h"
 #include "sysemu/runstate.h"
 #include "sysemu/sysemu.h"
@@ -27,6 +32,8 @@
 #define RT3883_FE_SIZE           0x00010000ULL
 #define RT3883_PCI_BASE          0x10140000ULL
 #define RT3883_PCI_SIZE          0x00020000ULL
+#define RT3883_EHCI_BASE         0x101c0000ULL
+#define RT3883_OHCI_BASE         0x101c1000ULL
 #define RT3883_FLASH_BASE        0x1c000000ULL
 #define RT3883_FLASH_SIZE        (8 * MiB)
 #define RT3883_UBOOT_LOAD_PHYS   0x00200000ULL
@@ -66,6 +73,7 @@
 #define RTL8367_PHY_BASE         0x2000
 #define RTL8367_PHY_OFFSET       5
 
+#define SYSCTL_REVID_OFF         0x000c
 #define SYSCTL_SYSCFG0_OFF       0x0010
 #define SYSCTL_RSTCTRL_OFF       0x0034
 #define SYSCTL_RSTCTRL_SYS_RST   (1U << 0)
@@ -80,6 +88,7 @@
  * SYSCFG0[17] = 1.  Keep the unknown strap bits zero rather than inventing
  * values which have not been recovered from the physical unit.
  */
+#define F9K1103_REVID_EVIDENCE   0x00000105U
 #define F9K1103_SYSCFG0_EVIDENCE ((3U << 8) | (1U << 17))
 #define SPI_OFF                  0x0b00
 #define SPI_STAT                 0x00
@@ -98,6 +107,32 @@
 
 #define PCI_REG_CFGDATA          0x0024
 #define PCI_REG_STATUS1          0x2050
+
+#define TYPE_RT3883_EHCI "rt3883-ehci-usb"
+
+static void rt3883_ehci_class_init(ObjectClass *oc, void *data)
+{
+    SysBusEHCIClass *sec = SYS_BUS_EHCI_CLASS(oc);
+
+    /* RT3883 generic-EHCI register layout, with the physical two ports. */
+    sec->capsbase = 0x0;
+    sec->opregbase = 0x20;
+    sec->portscbase = 0x44;
+    sec->portnr = 2;
+}
+
+static const TypeInfo rt3883_ehci_type_info = {
+    .name       = TYPE_RT3883_EHCI,
+    .parent     = TYPE_SYS_BUS_EHCI,
+    .class_init = rt3883_ehci_class_init,
+};
+
+static void rt3883_usb_register_types(void)
+{
+    type_register_static(&rt3883_ehci_type_info);
+}
+
+type_init(rt3883_usb_register_types)
 
 typedef enum RT3883SMIStage {
     SMI_STAGE_IDLE = 0,
@@ -440,6 +475,7 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     /* RT3883 / F9K1103 source + physical boot evidence. */
     s->soc_regs[0x00 >> 2] = 0x38335452;
     s->soc_regs[0x04 >> 2] = 0x20203338;
+    s->soc_regs[SYSCTL_REVID_OFF >> 2] = F9K1103_REVID_EVIDENCE;
     s->soc_regs[SYSCTL_SYSCFG0_OFF >> 2] = F9K1103_SYSCFG0_EVIDENCE;
     /*
      * Keep all output latches high at reset.  Active-low button state is
@@ -753,6 +789,16 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_init_io(&s->pci_mmio, OBJECT(machine), &rt3883_pci_ops, s,
                           "rt3883.pci-host", RT3883_PCI_SIZE);
     memory_region_add_subregion(sysmem, RT3883_PCI_BASE, &s->pci_mmio);
+
+    error_report("RT3883_M1_STAGE=usb_host");
+    DeviceState *ehci = qdev_new(TYPE_RT3883_EHCI);
+    sysbus_realize_and_unref(SYS_BUS_DEVICE(ehci), &error_fatal);
+    sysbus_mmio_map(SYS_BUS_DEVICE(ehci), 0, RT3883_EHCI_BASE);
+
+    DeviceState *ohci = qdev_new(TYPE_SYSBUS_OHCI);
+    qdev_prop_set_uint32(ohci, "num-ports", 2);
+    sysbus_realize_and_unref(SYS_BUS_DEVICE(ohci), &error_fatal);
+    sysbus_mmio_map(SYS_BUS_DEVICE(ohci), 0, RT3883_OHCI_BASE);
 
     error_report("RT3883_M1_STAGE=flash_map");
     memory_region_init_ram_nomigrate(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
