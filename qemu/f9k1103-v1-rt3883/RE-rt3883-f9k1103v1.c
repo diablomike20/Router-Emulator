@@ -60,6 +60,7 @@
 #define SYSCTL_RSTCTRL_SYS_RST   (1U << 0)
 #define SYSCTL_RSTCTRL_SPI_RST   (1U << 18)
 #define SYSCTL_RSTCTRL_FE_RST    (1U << 21)
+#define SYSCTL_RSTCTRL_PCIE_RST  (1U << 23)
 
 /*
  * Exact F9K1103 v1 boot evidence reports RT3883 at 500 MHz with DDR2.
@@ -507,6 +508,9 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
         if (v & SYSCTL_RSTCTRL_FE_RST) {
             rt3883_fe_reset(s);
         }
+        if (v & SYSCTL_RSTCTRL_PCIE_RST) {
+            rt3883_pci_reset(s);
+        }
         if (v & SYSCTL_RSTCTRL_SYS_RST) {
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
         }
@@ -558,6 +562,19 @@ static void rt3883_fe_write(void *opaque, hwaddr addr, uint64_t val, unsigned si
     RT3883F9K1103State *s = opaque;
     if ((addr >> 2) < ARRAY_SIZE(s->fe_regs)) s->fe_regs[addr >> 2] = val;
 }
+
+static const MemoryRegionOps rt3883_pci_ops = {
+    .read = rt3883_pci_read, .write = rt3883_pci_write,
+    .valid.min_access_size = 4, .valid.max_access_size = 4,
+    .impl.min_access_size = 4, .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+static const MemoryRegionOps rt3883_rt3091_ops = {
+    .read = rt3883_rt3091_read, .write = rt3883_rt3091_write,
+    .valid.min_access_size = 1, .valid.max_access_size = 4,
+    .impl.min_access_size = 1, .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
 
 static const MemoryRegionOps rt3883_soc_ops = {
     .read = rt3883_soc_read, .write = rt3883_soc_write,
@@ -638,6 +655,23 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_init_io(&s->fe_mmio, OBJECT(machine), &rt3883_fe_ops, s,
                           "rt3883.frame-engine", RT3883_FE_SIZE);
     memory_region_add_subregion(sysmem, RT3883_FE_BASE, &s->fe_mmio);
+
+    error_report("RT3883_M1_STAGE=pci_mmio");
+    memory_region_init_io(&s->pci_mmio, OBJECT(machine), &rt3883_pci_ops, s,
+                          "rt3883.pci-controller", RT3883_PCI_SIZE);
+    memory_region_add_subregion(sysmem, RT3883_PCI_BASE, &s->pci_mmio);
+
+    /*
+     * Fixed initial PCIe memory aperture for the physical RT3091 endpoint.
+     * Linux will size the BAR through config space and assigns 0x20000000
+     * on the reference F9K1103 boot.  Detailed radio behavior is a later
+     * fidelity layer; this backing region prevents invented bus faults.
+     */
+    memory_region_init_io(&s->rt3091_mmio, OBJECT(machine),
+                          &rt3883_rt3091_ops, s,
+                          "rt3883.rt3091-mmio", RT3883_PCI_MEM_SIZE);
+    memory_region_add_subregion(sysmem, RT3883_PCI_MEM_BASE,
+                                &s->rt3091_mmio);
 
     error_report("RT3883_M1_STAGE=flash_map");
     memory_region_init_ram_nomigrate(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
