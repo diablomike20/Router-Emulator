@@ -90,6 +90,22 @@ _start:
     nop
 
     /*
+     * Linux/MIPS detect_memory_region() probes powers of two above a magic
+     * word.  On the physical 64 MiB RT3883 board, address bit 26 wraps and
+     * +64 MiB aliases the same SDRAM.  Prove that without advertising 128 MiB.
+     */
+    lui $t0,0x8010
+    li $t1,0x52414d36
+    sw $t1,0($t0)
+    lui $t2,0x8410
+    lw $t3,0($t2)
+    bne $t1,$t3,ram_mirror_fail
+    nop
+    la $a0,msg_ram_mirror
+    jal uart_puts
+    nop
+
+    /*
      * FE reset is bit21.  This write must not reboot the whole machine.
      */
     lui $s1,0xb000
@@ -201,6 +217,12 @@ gpio_bank_fail:
     nop
     b hang
     nop
+ram_mirror_fail:
+    la $a0,msg_ram_mirror_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 syscfg_fail:
     la $a0,msg_syscfg_fail
     jal uart_puts
@@ -240,6 +262,7 @@ msg_flash: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=PASS\n"
 msg_gpio: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=PASS\n"
 msg_gpio_bank: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=PASS\n"
 msg_syscfg: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=PASS\n"
+msg_ram_mirror: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
@@ -249,5 +272,6 @@ msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
 msg_gpio_fail: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=FAIL\n"
 msg_gpio_bank_fail: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=FAIL\n"
 msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
+msg_ram_mirror_fail: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
 msg_spi_rdsr_fail: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=FAIL\n"
