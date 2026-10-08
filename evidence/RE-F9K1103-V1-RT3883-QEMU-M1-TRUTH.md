@@ -21,10 +21,10 @@ Private recovered MTD bytes are never committed to the public repository.
 `f9k1103-v1-rt3883-uboot-emulator-m1`
 
 Current HEAD:
-`feaef6f250f23c901a7ed26f1f2ba1ab42efe84d`
+`6e2725da8b3f170ddaa3d5ee5f1372a6fdd65920`
 
 Latest CI:
-run `37710026437` — SUCCESS
+run `37714685665` — SUCCESS
 
 ## CI-verified machine gates
 
@@ -40,6 +40,11 @@ run `37710026437` — SUCCESS
 - SPI RDID
 - SPI RDSR STARTWR/STARTRD self-clearing strobe behavior
 - whole-system reset
+- RT3883 WMAC 0x10180000 / 0x40000 MMIO identity window
+- WMAC MAC_CSR0 identity `0x38830400`
+- WMAC BBP indirect BUSY/read/write handshake
+- WMAC RFCSR indirect BUSY/read/write handshake
+- RT3883 FE/PDMA TX completion lifecycle and CPU IRQ5 signaling
 
 ## Exact runtime progression
 
@@ -75,9 +80,10 @@ U-Boot side:
 - original Belkin vendor switch init no longer fails at the former `0x13C2` write
 
 Linux side:
-- `rtl8367b` now identifies an RTL8367R-VB chip
-- chip reset currently times out
-- Linux-side switch reset/register lifecycle is therefore still incomplete
+- `rtl8367b` identifies an RTL8367R-VB chip
+- earlier exact runtime on the WMAC-shell branch verified the Linux CHIP_RESET self-clear fix through `libphy: rtl8367: probed`
+- that reset behavior has been reintegrated into the current M1 branch
+- current integrated HEAD still requires a fresh exact-runtime revalidation after the recent WMAC/PDMA changes
 
 ## USB status
 
@@ -92,15 +98,51 @@ OHCI:
 
 ## Current exact-runtime blocker
 
-The next fatal blocker is the integrated RT3883 WMAC at:
+The former fatal WMAC-unmapped blocker at physical `0x10180000` is closed at the model/CI level.
 
-- physical `0x10180000`
-- KSEG1 `0xb0180000`
+A later exact runtime reached:
+- WMAC identity: RT3883 rev `0x0400`
+- RF identity: RF3853
+- BBP indirect access at `WMAC+0x101c`
 
-Linux `rt2800_wmac` loads EEPROM data from the exact `factory` partition and then performs MMIO against the WMAC region. The current machine does not yet model that region, causing a data bus error during `rt2800soc` probe.
+The current branch now additionally models:
+- BBP indirect BUSY self-clear/read/write
+- RFCSR indirect BUSY self-clear/read/write
+- FE/PDMA TX completion + IRQ5
+
+These newest semantics are CI-verified but still require a fresh integrated exact-runtime run before they can be promoted to LIFECYCLE_VERIFIED.
 
 Status:
-`RT3883_WMAC_0x10180000 = REQUIRED / NEXT_FATAL_BLOCKER`
+`CURRENT_NEXT_BLOCKER = TARGET_RUNTIME_REQUIRED_AFTER_WMAC_RFCSR_PDMA_INTEGRATION`
+
+## F9K1109 v1 donor runtime evidence
+
+Classification: `DONOR_RUNTIME_VERIFIED` — not a substitute for F9K1103 exact evidence, but unusually strong because the F9K1109 v1 is the same RT3883 / RTL8367R-VB Belkin family and OpenWrt still uses the stock image identity `N750F9K1103VB`.
+
+Public OpenWrt device-page UART logs provide both OEM and OpenWrt boots.
+
+OEM bootlog confirms:
+- ARC U-Boot 1.7.4 / Ralink U-Boot 3.5.2.0
+- RT3883_MP
+- DDR2, 64 MiB
+- CPU 500 MHz
+- MX25L6405D JEDEC `c2 20 17`
+- 64 KiB I-cache / 32 KiB D-cache, 4-way, 32-byte lines
+- RTL8367R-VB identity `0x1010`
+- stock image name `N750F9K1103VB`
+- CPU PRId `0x0001974c`
+
+OpenWrt bootlog confirms:
+- RT3883 ver 1 / eco 5
+- MIPS 74Kc PRId `0x0001974c`
+- 64 MiB RAM
+- same SPI NOR and 0x30000/0x10000/0x10000/0x7a0000/0x10000 partition scheme
+- Frame Engine at `0x10100000`, CPU IRQ5, fixed 1000/full link
+- PCI radio: RT chipset 3071 rev `0x021c`, RF chipset `0x0008`
+- SoC WMAC: RT chipset 3883 rev `0x0400`, RF chipset 3853
+- both radios load EEPROM from the `factory` partition
+
+This donor log independently validates the emulator's current RT3883 identity, RF3853 WMAC path, FE IRQ5 wiring, SPI layout, cache geometry target and RTL8367R-VB identity.
 
 ## Fidelity boundary
 
@@ -108,9 +150,9 @@ Status:
 - CPU: QEMU `74Kf` compatibility baseline
 - physical F9K1103 CPU evidence: PRId `0x0001974c`, 64 KiB I-cache, 32 KiB D-cache, 4-way, 32-byte lines
 - current exact-runtime logs from older artifacts can still show QEMU PRId/cache geometry; this is a known fidelity gap
-- FE/PDMA packet transport is not yet full network lifecycle fidelity
+- FE/PDMA packet transport is not yet full host-network dataplane fidelity
 - integrated 2.4 GHz PCI RT309x endpoint is not yet modeled
-- RT3883 integrated WMAC is the current fatal boot blocker
+- WMAC BBP/RFCSR semantics are present but full radio dataplane/IRQ/DMA fidelity is not yet claimed
 
 ## User-input dependency
 
