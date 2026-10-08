@@ -20,6 +20,7 @@
 #include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
 #include "net/net.h"
+#include "net/checksum.h"
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
 #include "qemu/module.h"
@@ -151,6 +152,7 @@
 #define FE_TX_DMA_LS1            (1U << 14)
 #define FE_TX_DMA_LS0            (1U << 30)
 #define FE_RX_DMA_BUF_LEN        0x3fffU
+#define FE_TX_DMA_CHKSUM         (0x7U << 29)
 
 /*
  * RT3883 integrated WiSoC MAC.  OpenWrt RT3883 DTS maps a 0x40000-byte
@@ -231,6 +233,7 @@ typedef struct RT3883F9K1103State {
     uint32_t fe_rx_next;
     uint8_t fe_tx_frame[NET_BUFSIZE];
     size_t fe_tx_frame_len;
+    bool fe_tx_needs_csum;
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -347,6 +350,7 @@ static void rt3883_fe_reset(RT3883F9K1103State *s)
     memset(s->fe_regs, 0, sizeof(s->fe_regs));
     s->fe_rx_next = 0;
     s->fe_tx_frame_len = 0;
+    s->fe_tx_needs_csum = false;
     rt3883_fe_update_irq(s);
 }
 
@@ -441,11 +445,21 @@ static void rt3883_fe_tx_emit(RT3883F9K1103State *s)
 
     len = rt3883_fe_lan_egress(s->fe_tx_frame, s->fe_tx_frame_len,
                                frame, sizeof(frame));
+    if (len && s->fe_tx_needs_csum) {
+        /*
+         * LEDE 4.4 sets TX_DMA_CHKSUM when skb->ip_summed is
+         * CHECKSUM_PARTIAL.  Complete the checksum at the same boundary at
+         * which the real Frame Engine would, after the external LAN port has
+         * removed the CPU-port VLAN tag.
+         */
+        net_checksum_calculate(frame, len, CSUM_ALL);
+    }
     if (len && s->fe_nic) {
         qemu_send_packet(qemu_get_queue(s->fe_nic), frame, len);
     }
 
     s->fe_tx_frame_len = 0;
+    s->fe_tx_needs_csum = false;
 }
 
 static bool rt3883_fe_rx_desc_available(RT3883F9K1103State *s)
@@ -588,7 +602,7 @@ static void rt3883_fe_tx_kick(RT3883F9K1103State *s)
     while (dtx != ctx && done < count) {
         hwaddr desc_addr = (hwaddr)base + (hwaddr)dtx * FE_TX_DESC_SIZE;
         uint8_t desc[FE_TX_DESC_SIZE];
-        uint32_t txd1, txd2, txd3;
+        uint32_t txd1, txd2, txd3, txd4;
         unsigned plen0, plen1;
         bool ls0, ls1;
 
@@ -599,6 +613,10 @@ static void rt3883_fe_tx_kick(RT3883F9K1103State *s)
         txd1 = ldl_le_p(desc);
         txd2 = ldl_le_p(desc + 4);
         txd3 = ldl_le_p(desc + 8);
+        txd4 = ldl_le_p(desc + 12);
+        if (txd4 & FE_TX_DMA_CHKSUM) {
+            s->fe_tx_needs_csum = true;
+        }
         plen0 = (txd2 >> 16) & FE_TX_DMA_BUF_LEN;
         plen1 = txd2 & FE_TX_DMA_BUF_LEN;
         ls0 = !!(txd2 & FE_TX_DMA_LS0);
