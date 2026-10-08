@@ -165,6 +165,20 @@ _start:
     nop
 
     /*
+     * RT3883 integrated WMAC: DTS maps 0x10180000..0x101bffff.
+     * rt2800soc identifies RT3883 through MAC_CSR0 at +0x1000.
+     * Real RT3883/OpenWrt boots report chipset 3883, rev 0400.
+     */
+    lui $t0,0xb018
+    lw $t1,0x1000($t0)
+    li $t2,0x38830400
+    bne $t1,$t2,wmac_probe_fail
+    nop
+    la $a0,msg_wmac_probe
+    jal uart_puts
+    nop
+
+    /*
      * FE reset is bit21.  This write must not reboot the whole machine.
      */
     lui $s1,0xb000
@@ -276,6 +290,12 @@ gpio_bank_fail:
     nop
     b hang
     nop
+wmac_probe_fail:
+    la $a0,msg_wmac_probe_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 usb_host_fail:
     la $a0,msg_usb_host_fail
     jal uart_puts
@@ -343,6 +363,7 @@ msg_revid: .asciz "RT3883_F9K1103V1_REVID_1_5_GATE=PASS\n"
 msg_ram_mirror: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=PASS\n"
 msg_pci_host: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=PASS\n"
 msg_usb_host: .asciz "RT3883_F9K1103V1_USB_HOST_2PORT_GATE=PASS\n"
+msg_wmac_probe: .asciz "RT3883_F9K1103V1_WMAC_RT3883_REV0400_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
@@ -356,5 +377,6 @@ msg_revid_fail: .asciz "RT3883_F9K1103V1_REVID_1_5_GATE=FAIL\n"
 msg_ram_mirror_fail: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=FAIL\n"
 msg_pci_host_fail: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=FAIL\n"
 msg_usb_host_fail: .asciz "RT3883_F9K1103V1_USB_HOST_2PORT_GATE=FAIL\n"
+msg_wmac_probe_fail: .asciz "RT3883_F9K1103V1_WMAC_RT3883_REV0400_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
 msg_spi_rdsr_fail: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=FAIL\n"
