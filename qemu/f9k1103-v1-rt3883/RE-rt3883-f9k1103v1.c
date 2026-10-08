@@ -412,6 +412,12 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
 {
     memset(s->soc_regs, 0, sizeof(s->soc_regs));
     rt3883_fe_reset(s);
+    memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
+    memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
+    rt3883_smi_end(s);
+    s->smi_prev_sck = true;
+    s->smi_prev_sda = true;
+    s->smi_prev_valid = true;
     s->uart_rx_r = s->uart_rx_w = 0;
     rt3883_spi_controller_reset(s);
 
@@ -432,6 +438,24 @@ static uint32_t rt3883_pio_read_data(RT3883F9K1103State *s,
 {
     uint32_t data = s->soc_regs[data_off >> 2];
     uint32_t dir = s->soc_regs[dir_off >> 2];
+
+    if (data_off == PIO_DATA0_OFF) {
+        const uint32_t sda_bit = 1U << F9K1103_SMI_SDA_GPIO;
+
+        if (!(dir & sda_bit) && s->smi_active) {
+            if (s->smi_stage == SMI_STAGE_DEVICE_ACK) {
+                data &= ~sda_bit;
+            } else if (s->smi_stage == SMI_STAGE_DEVICE_READ) {
+                if (s->smi_read_line) {
+                    data |= sda_bit;
+                } else {
+                    data &= ~sda_bit;
+                }
+            } else {
+                data |= sda_bit;
+            }
+        }
+    }
 
     if (data_off == PIO_DATA24_OFF) {
         /*
@@ -461,6 +485,9 @@ static bool rt3883_pio_write(RT3883F9K1103State *s, hwaddr addr, uint32_t v)
     switch (addr) {
     case PIO_DATA0_OFF:
     case PIO_DIR0_OFF:
+        s->soc_regs[addr >> 2] = v;
+        rt3883_smi_observe(s);
+        return true;
     case PIO_DATA24_OFF:
     case PIO_DIR24_OFF:
         s->soc_regs[addr >> 2] = v;
@@ -468,10 +495,12 @@ static bool rt3883_pio_write(RT3883F9K1103State *s, hwaddr addr, uint32_t v)
     case PIO_SET0_OFF:
         s->soc_regs[PIO_DATA0_OFF >> 2] |= v;
         s->soc_regs[addr >> 2] = v;
+        rt3883_smi_observe(s);
         return true;
     case PIO_RESET0_OFF:
         s->soc_regs[PIO_DATA0_OFF >> 2] &= ~v;
         s->soc_regs[addr >> 2] = v;
+        rt3883_smi_observe(s);
         return true;
     case PIO_SET24_OFF:
         s->soc_regs[PIO_DATA24_OFF >> 2] |= v;
