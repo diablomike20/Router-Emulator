@@ -63,6 +63,10 @@
 #define RTL8367_REG_IND_ADDR     0x1f02
 #define RTL8367_REG_IND_WRDATA   0x1f03
 #define RTL8367_REG_IND_RDDATA   0x1f04
+#define RTL8367_REG_CHIP_NUMBER  0x1300
+#define RTL8367_REG_CHIP_VERSION 0x1301
+#define RTL8367_REG_CHIP_MODE    0x1302
+#define RTL8367_CHIPVER_R_VB     0x1010
 #define RTL8367_IND_CMD          0x0001
 #define RTL8367_IND_WRITE        0x0002
 #define RTL8367_PHY_BASE         0x2000
@@ -454,6 +458,13 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     rt3883_usbhost_reset(s);
     memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
     memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
+    /*
+     * F9K1103 v1 board evidence identifies the external switch as
+     * RTL8367R-VB.  Linux 4.4 rtl8367b.c accepts CHIP_VER 0x1010 as
+     * RTL8367R-VB.  Keep chip number/mode at reset default until exact
+     * board evidence requires non-zero values; detection keys on version.
+     */
+    s->rtl8367_regs[RTL8367_REG_CHIP_VERSION] = RTL8367_CHIPVER_R_VB;
     rt3883_smi_end(s);
     s->smi_prev_sck = true;
     s->smi_prev_sda = true;
