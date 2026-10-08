@@ -212,6 +212,202 @@ static void rt3883_fe_reset(RT3883F9K1103State *s)
     memset(s->fe_regs, 0, sizeof(s->fe_regs));
 }
 
+static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
+                                        uint16_t reg)
+{
+    if (reg == RTL8367_REG_IND_STATUS) {
+        /* M1 switch model completes PHY indirect operations immediately. */
+        return 0;
+    }
+    return s->rtl8367_regs[reg];
+}
+
+static void rt3883_rtl8367_reg_write(RT3883F9K1103State *s,
+                                      uint16_t reg, uint16_t value)
+{
+    s->rtl8367_regs[reg] = value;
+
+    if (reg == RTL8367_REG_IND_CTRL && (value & RTL8367_IND_CMD)) {
+        uint16_t addr = s->rtl8367_regs[RTL8367_REG_IND_ADDR];
+
+        if (addr >= RTL8367_PHY_BASE) {
+            unsigned phy = (addr - RTL8367_PHY_BASE) >> RTL8367_PHY_OFFSET;
+            unsigned phy_reg = addr & 0x1f;
+
+            if (phy < ARRAY_SIZE(s->rtl8367_phy) &&
+                phy_reg < ARRAY_SIZE(s->rtl8367_phy[0])) {
+                if (value & RTL8367_IND_WRITE) {
+                    s->rtl8367_phy[phy][phy_reg] =
+                        s->rtl8367_regs[RTL8367_REG_IND_WRDATA];
+                } else {
+                    s->rtl8367_regs[RTL8367_REG_IND_RDDATA] =
+                        s->rtl8367_phy[phy][phy_reg];
+                }
+            }
+        }
+
+        s->rtl8367_regs[RTL8367_REG_IND_STATUS] = 0;
+    }
+}
+
+static void rt3883_smi_begin(RT3883F9K1103State *s)
+{
+    s->smi_active = true;
+    s->smi_stage = SMI_STAGE_HOST_BITS;
+    s->smi_cmd = 0;
+    s->smi_shift = 0;
+    s->smi_host_bytes = 0;
+    s->smi_data_lo = 0;
+    s->smi_addr = 0;
+    s->smi_read_value = 0;
+    s->smi_bits = 0;
+    s->smi_read_bit = 0;
+    s->smi_read_byte = 0;
+    s->smi_read_line = true;
+}
+
+static void rt3883_smi_end(RT3883F9K1103State *s)
+{
+    s->smi_active = false;
+    s->smi_stage = SMI_STAGE_IDLE;
+    s->smi_bits = 0;
+    s->smi_read_bit = 0;
+    s->smi_read_byte = 0;
+    s->smi_read_line = true;
+}
+
+static void rt3883_smi_host_byte(RT3883F9K1103State *s, uint8_t byte)
+{
+    switch (s->smi_host_bytes) {
+    case 0:
+        s->smi_cmd = byte;
+        break;
+    case 1:
+        s->smi_addr = byte;
+        break;
+    case 2:
+        s->smi_addr |= (uint16_t)byte << 8;
+        break;
+    case 3:
+        if (!(s->smi_cmd & 1)) {
+            s->smi_data_lo = byte;
+        }
+        break;
+    case 4:
+        if (!(s->smi_cmd & 1)) {
+            rt3883_rtl8367_reg_write(s, s->smi_addr,
+                                     s->smi_data_lo | ((uint16_t)byte << 8));
+        }
+        break;
+    default:
+        break;
+    }
+
+    s->smi_host_bytes++;
+    s->smi_shift = 0;
+    s->smi_bits = 0;
+    s->smi_stage = SMI_STAGE_DEVICE_ACK;
+}
+
+static void rt3883_smi_ack_complete(RT3883F9K1103State *s)
+{
+    if ((s->smi_cmd & 1) && s->smi_host_bytes == 3) {
+        s->smi_read_value = rt3883_rtl8367_reg_read(s, s->smi_addr);
+        s->smi_read_byte = 0;
+        s->smi_read_bit = 0;
+        s->smi_stage = SMI_STAGE_DEVICE_READ;
+    } else {
+        s->smi_stage = SMI_STAGE_HOST_BITS;
+    }
+}
+
+static void rt3883_smi_observe(RT3883F9K1103State *s)
+{
+    const uint32_t sda_bit = 1U << F9K1103_SMI_SDA_GPIO;
+    const uint32_t sck_bit = 1U << F9K1103_SMI_SCK_GPIO;
+    uint32_t data = s->soc_regs[PIO_DATA0_OFF >> 2];
+    uint32_t dir = s->soc_regs[PIO_DIR0_OFF >> 2];
+    bool sda = !!(data & sda_bit);
+    bool sck = !!(data & sck_bit);
+    bool sda_out = !!(dir & sda_bit);
+    bool sck_out = !!(dir & sck_bit);
+
+    if (!s->smi_prev_valid) {
+        s->smi_prev_sda = sda;
+        s->smi_prev_sck = sck;
+        s->smi_prev_valid = true;
+        return;
+    }
+
+    /* Realtek GPIO-SMI start: SDA 1->0 while SCK is held high. */
+    if (sda_out && sck_out &&
+        s->smi_prev_sda && !sda &&
+        s->smi_prev_sck && sck) {
+        rt3883_smi_begin(s);
+    }
+
+    /* Stop: SDA 0->1 while SCK remains high. */
+    if (s->smi_active && sda_out && sck_out &&
+        !s->smi_prev_sda && sda &&
+        s->smi_prev_sck && sck) {
+        rt3883_smi_end(s);
+    }
+
+    if (s->smi_active && sck_out && !s->smi_prev_sck && sck) {
+        switch (s->smi_stage) {
+        case SMI_STAGE_HOST_BITS:
+            if (sda_out) {
+                s->smi_shift = (s->smi_shift << 1) | (sda ? 1 : 0);
+                if (++s->smi_bits == 8) {
+                    rt3883_smi_host_byte(s, s->smi_shift);
+                }
+            }
+            break;
+        case SMI_STAGE_DEVICE_READ:
+            if (!sda_out) {
+                uint8_t b = s->smi_read_byte ?
+                    (s->smi_read_value >> 8) : (s->smi_read_value & 0xff);
+                s->smi_read_line =
+                    !!(b & (1U << (7 - s->smi_read_bit)));
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (s->smi_active && sck_out && s->smi_prev_sck && !sck) {
+        switch (s->smi_stage) {
+        case SMI_STAGE_DEVICE_ACK:
+            if (!sda_out) {
+                rt3883_smi_ack_complete(s);
+            }
+            break;
+        case SMI_STAGE_DEVICE_READ:
+            if (!sda_out && ++s->smi_read_bit == 8) {
+                s->smi_stage = SMI_STAGE_HOST_READ_ACK;
+            }
+            break;
+        case SMI_STAGE_HOST_READ_ACK:
+            if (sda_out) {
+                if (s->smi_read_byte == 0) {
+                    s->smi_read_byte = 1;
+                    s->smi_read_bit = 0;
+                    s->smi_stage = SMI_STAGE_DEVICE_READ;
+                } else {
+                    s->smi_stage = SMI_STAGE_WAIT_STOP;
+                }
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    s->smi_prev_sda = sda;
+    s->smi_prev_sck = sck;
+}
+
 static void rt3883_device_reset_state(RT3883F9K1103State *s)
 {
     memset(s->soc_regs, 0, sizeof(s->soc_regs));
