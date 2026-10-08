@@ -29,6 +29,8 @@
 #define RT3883_PCI_SIZE          0x00020000ULL
 #define RT3883_USBHOST_BASE      0x101c0000ULL
 #define RT3883_USBHOST_SIZE      0x00040000ULL
+#define RT3883_WMAC_BASE         0x10180000ULL
+#define RT3883_WMAC_SIZE         0x00040000ULL
 #define RT3883_FLASH_BASE        0x1c000000ULL
 #define RT3883_FLASH_SIZE        (8 * MiB)
 #define RT3883_UBOOT_LOAD_PHYS   0x00200000ULL
@@ -66,6 +68,7 @@
 #define RTL8367_REG_CHIP_NUMBER  0x1300
 #define RTL8367_REG_CHIP_VERSION 0x1301
 #define RTL8367_REG_CHIP_MODE    0x1302
+#define RTL8367_REG_CHIP_RESET   0x1322
 #define RTL8367_CHIPVER_R_VB     0x1010
 #define RTL8367_IND_CMD          0x0001
 #define RTL8367_IND_WRITE        0x0002
@@ -76,6 +79,7 @@
 #define SYSCTL_RSTCTRL_OFF       0x0034
 #define SYSCTL_RSTCTRL_SYS_RST   (1U << 0)
 #define SYSCTL_RSTCTRL_SPI_RST   (1U << 18)
+#define SYSCTL_RSTCTRL_WLAN_RST  (1U << 20)
 #define SYSCTL_RSTCTRL_FE_RST    (1U << 21)
 #define SYSCTL_RSTCTRL_UHST_RST   (1U << 22)
 #define SYSCTL_RSTCTRL_PCIE_RST  (1U << 23)
@@ -144,12 +148,13 @@ typedef enum RT3883SMIStage {
 } RT3883SMIStage;
 
 typedef struct RT3883F9K1103State {
-    MemoryRegion soc_mmio, fe_mmio, pci_mmio, usbhost_mmio, flash_mr, ram_mirror;
+    MemoryRegion soc_mmio, fe_mmio, pci_mmio, usbhost_mmio, wmac_mmio, flash_mr, ram_mirror;
     CharBackend chr;
     uint32_t soc_regs[RT3883_SOC_SIZE / 4];
     uint32_t fe_regs[RT3883_FE_SIZE / 4];
     uint32_t pci_regs[RT3883_PCI_SIZE / 4];
     uint32_t usbhost_regs[RT3883_USBHOST_SIZE / 4];
+    uint32_t wmac_regs[RT3883_WMAC_SIZE / 4];
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -289,6 +294,18 @@ static void rt3883_usbhost_reset(RT3883F9K1103State *s)
     s->usbhost_regs[EHCI_USBSTS_OFF >> 2] = EHCI_STS_HALT;
 }
 
+static void rt3883_wmac_reset(RT3883F9K1103State *s)
+{
+    /*
+     * The RT3883 integrated 5 GHz MAC/BBP occupies 0x10180000..0x101bffff.
+     * M1 first exposes an honest reset-zero shell: no fabricated radio ID,
+     * EEPROM state, DMA engine or RF activity.  This converts an unmapped
+     * bus exception into normal driver-visible register reads so rt2800soc
+     * can reveal the exact semantics it needs next.
+     */
+    memset(s->wmac_regs, 0, sizeof(s->wmac_regs));
+}
+
 static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
                                         uint16_t reg)
 {
@@ -302,6 +319,18 @@ static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
 static void rt3883_rtl8367_reg_write(RT3883F9K1103State *s,
                                       uint16_t reg, uint16_t value)
 {
+    if (reg == RTL8367_REG_CHIP_RESET && (value & 1)) {
+        /*
+         * RTL8367R-VB CHIP_RESET is a self-clearing command bit.  Linux
+         * writes 1 and polls until hardware returns 0.  Reset the emulated
+         * register/PHY state immediately, but retain immutable chip identity.
+         */
+        memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
+        memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
+        s->rtl8367_regs[RTL8367_REG_CHIP_VERSION] = RTL8367_CHIPVER_R_VB;
+        return;
+    }
+
     s->rtl8367_regs[reg] = value;
 
     if (reg == RTL8367_REG_IND_CTRL && (value & RTL8367_IND_CMD)) {
@@ -491,6 +520,7 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     rt3883_fe_reset(s);
     rt3883_pci_reset(s);
     rt3883_usbhost_reset(s);
+    rt3883_wmac_reset(s);
     memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
     memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
     /*
@@ -652,6 +682,9 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
          */
         if (v & SYSCTL_RSTCTRL_SPI_RST) {
             rt3883_spi_controller_reset(s);
+        }
+        if (v & SYSCTL_RSTCTRL_WLAN_RST) {
+            rt3883_wmac_reset(s);
         }
         if (v & SYSCTL_RSTCTRL_FE_RST) {
             rt3883_fe_reset(s);
@@ -840,6 +873,29 @@ static const MemoryRegionOps rt3883_usbhost_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+static uint64_t rt3883_wmac_read(void *opaque, hwaddr addr, unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+    return ((addr >> 2) < ARRAY_SIZE(s->wmac_regs)) ?
+           s->wmac_regs[addr >> 2] : 0;
+}
+
+static void rt3883_wmac_write(void *opaque, hwaddr addr, uint64_t val,
+                              unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+    if ((addr >> 2) < ARRAY_SIZE(s->wmac_regs)) {
+        s->wmac_regs[addr >> 2] = (uint32_t)val;
+    }
+}
+
+static const MemoryRegionOps rt3883_wmac_ops = {
+    .read = rt3883_wmac_read, .write = rt3883_wmac_write,
+    .valid.min_access_size = 1, .valid.max_access_size = 4,
+    .impl.min_access_size = 1, .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
 static void rt3883_cpu_reset(void *opaque)
 {
     RT3883ResetData *r = opaque;
@@ -918,6 +974,13 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
                           "rt3883.usb-host", RT3883_USBHOST_SIZE);
     memory_region_add_subregion(sysmem, RT3883_USBHOST_BASE,
                                 &s->usbhost_mmio);
+
+    error_report("RT3883_M1_STAGE=wmac_mmio");
+    memory_region_init_io(&s->wmac_mmio, OBJECT(machine),
+                          &rt3883_wmac_ops, s,
+                          "rt3883.wmac", RT3883_WMAC_SIZE);
+    memory_region_add_subregion(sysmem, RT3883_WMAC_BASE,
+                                &s->wmac_mmio);
 
     error_report("RT3883_M1_STAGE=flash_map");
     memory_region_init_ram_nomigrate(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
