@@ -138,6 +138,29 @@
 #define EHCI_STS_HALT             (1U << 12)
 #define EHCI_PORT_POWER           (1U << 12)
 
+/*
+ * RT3883 OHCI companion sits at USB-host base + 0x1000.
+ * M1 models only enough OHCI 1.0 state for a two-port empty root hub.
+ */
+#define OHCI_BASE_OFF             0x1000
+#define OHCI_REVISION_OFF         (OHCI_BASE_OFF + 0x00)
+#define OHCI_CONTROL_OFF          (OHCI_BASE_OFF + 0x04)
+#define OHCI_CMDSTATUS_OFF        (OHCI_BASE_OFF + 0x08)
+#define OHCI_INTRSTATUS_OFF       (OHCI_BASE_OFF + 0x0c)
+#define OHCI_INTRENABLE_OFF       (OHCI_BASE_OFF + 0x10)
+#define OHCI_INTRDISABLE_OFF      (OHCI_BASE_OFF + 0x14)
+#define OHCI_FMINTERVAL_OFF       (OHCI_BASE_OFF + 0x34)
+#define OHCI_PERIODICSTART_OFF    (OHCI_BASE_OFF + 0x40)
+#define OHCI_RHDESCA_OFF          (OHCI_BASE_OFF + 0x48)
+#define OHCI_RHDESCB_OFF          (OHCI_BASE_OFF + 0x4c)
+#define OHCI_RHSTATUS_OFF         (OHCI_BASE_OFF + 0x50)
+#define OHCI_RHPORT0_OFF          (OHCI_BASE_OFF + 0x54)
+#define OHCI_RHPORT1_OFF          (OHCI_BASE_OFF + 0x58)
+#define OHCI_REVISION_1_0         0x10
+#define OHCI_CMD_HCR              (1U << 0)
+#define OHCI_FI_DEFAULT           0x2edf
+#define OHCI_RH_NDP_2             0x00000002
+
 typedef enum RT3883SMIStage {
     SMI_STAGE_IDLE = 0,
     SMI_STAGE_HOST_BITS,
@@ -272,6 +295,21 @@ static void rt3883_pci_reset(RT3883F9K1103State *s)
     s->pci_regs[PCI_REG_STATUS1 >> 2] = 0;
 }
 
+static void rt3883_ohci_reset(RT3883F9K1103State *s)
+{
+    /*
+     * Physical F9K1103 evidence reports a two-port OHCI companion.
+     * Keep all port-status bits clear (nothing attached) and seed only
+     * standard architectural identity/timing registers.
+     */
+    for (hwaddr off = OHCI_BASE_OFF; off < OHCI_BASE_OFF + 0x1000; off += 4) {
+        s->usbhost_regs[off >> 2] = 0;
+    }
+    s->usbhost_regs[OHCI_REVISION_OFF >> 2] = OHCI_REVISION_1_0;
+    s->usbhost_regs[OHCI_FMINTERVAL_OFF >> 2] = OHCI_FI_DEFAULT;
+    s->usbhost_regs[OHCI_RHDESCA_OFF >> 2] = OHCI_RH_NDP_2;
+}
+
 static void rt3883_usbhost_reset(RT3883F9K1103State *s)
 {
     memset(s->usbhost_regs, 0, sizeof(s->usbhost_regs));
@@ -292,6 +330,8 @@ static void rt3883_usbhost_reset(RT3883F9K1103State *s)
     s->usbhost_regs[EHCI_HCSPARAMS_OFF >> 2] = 2;
     s->usbhost_regs[EHCI_HCCPARAMS_OFF >> 2] = 0;
     s->usbhost_regs[EHCI_USBSTS_OFF >> 2] = EHCI_STS_HALT;
+
+    rt3883_ohci_reset(s);
 }
 
 static void rt3883_wmac_reset(RT3883F9K1103State *s)
@@ -818,6 +858,46 @@ static void rt3883_usbhost_write(void *opaque, hwaddr addr, uint64_t val,
     }
 
     switch (addr) {
+    case OHCI_REVISION_OFF:
+    case OHCI_RHDESCA_OFF:
+        /* Read-only identity in the M1 no-device companion model. */
+        return;
+
+    case OHCI_CMDSTATUS_OFF:
+        /*
+         * HcCommandStatus.HCR is a command bit. Linux writes it and polls
+         * until hardware self-clears. Complete reset immediately.
+         */
+        if (v & OHCI_CMD_HCR) {
+            rt3883_ohci_reset(s);
+            return;
+        }
+        s->usbhost_regs[addr >> 2] = v & ~OHCI_CMD_HCR;
+        return;
+
+    case OHCI_INTRSTATUS_OFF:
+        /* OHCI interrupt status is write-one-to-clear. */
+        s->usbhost_regs[addr >> 2] &= ~v;
+        return;
+
+    case OHCI_INTRENABLE_OFF:
+        s->usbhost_regs[OHCI_INTRENABLE_OFF >> 2] |= v;
+        return;
+
+    case OHCI_INTRDISABLE_OFF:
+        s->usbhost_regs[OHCI_INTRENABLE_OFF >> 2] &= ~v;
+        s->usbhost_regs[OHCI_INTRDISABLE_OFF >> 2] = v;
+        return;
+
+    case OHCI_RHPORT0_OFF:
+    case OHCI_RHPORT1_OFF:
+        /*
+         * No downstream device is attached. Do not fabricate CCS/PES/change
+         * events. Port-control writes are accepted but read back disconnected.
+         */
+        s->usbhost_regs[addr >> 2] = 0;
+        return;
+
     case EHCI_CAPBASE_OFF:
     case EHCI_HCSPARAMS_OFF:
     case EHCI_HCCPARAMS_OFF:
