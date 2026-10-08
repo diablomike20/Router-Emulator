@@ -129,6 +129,11 @@
 #define WMAC_BBP_READ_CONTROL    0x00010000U
 #define WMAC_BBP_BUSY            0x00020000U
 #define WMAC_BBP_RW_MODE         0x00080000U
+#define WMAC_RF_CSR_CFG          0x0500
+#define WMAC_RF_DATA_MASK        0x000000ffU
+#define WMAC_RF_REGNUM_MASK      0x00003f00U
+#define WMAC_RF_WRITE            0x00010000U
+#define WMAC_RF_BUSY             0x00020000U
 
 /*
  * BBP_R0 is a read-only BBP version/status register.  RT3883 vendor and
@@ -182,6 +187,7 @@ typedef struct RT3883F9K1103State {
     uint32_t pci_regs[RT3883_PCI_SIZE / 4];
     uint32_t wmac_regs[RT3883_WMAC_SIZE / 4];
     uint8_t wmac_bbp[256];
+    uint8_t wmac_rf[64];
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -299,6 +305,7 @@ static void rt3883_wmac_reset(RT3883F9K1103State *s)
 {
     memset(s->wmac_regs, 0, sizeof(s->wmac_regs));
     memset(s->wmac_bbp, 0, sizeof(s->wmac_bbp));
+    memset(s->wmac_rf, 0, sizeof(s->wmac_rf));
 
     /*
      * MAC identity is evidence-derived.  BBP0 is deliberately only a
@@ -777,6 +784,28 @@ static void rt3883_wmac_write(void *opaque, hwaddr addr, uint64_t val,
 {
     RT3883F9K1103State *s = opaque;
     uint32_t v = (uint32_t)val;
+
+    if (addr == WMAC_RF_CSR_CFG && (v & WMAC_RF_BUSY)) {
+        unsigned regnum = (v & WMAC_RF_REGNUM_MASK) >> 8;
+
+        /*
+         * RT2800 RFCSR indirect engine.  The driver writes BUSY=1 to kick
+         * either a read (WRITE=0) or write (WRITE=1), then polls BUSY until
+         * hardware clears it.  Complete synchronously and keep a 64-byte
+         * RFCSR shadow; device-specific side effects remain exact-runtime
+         * driven rather than fabricated.
+         */
+        if (v & WMAC_RF_WRITE) {
+            s->wmac_rf[regnum] = v & WMAC_RF_DATA_MASK;
+            v &= ~WMAC_RF_BUSY;
+        } else {
+            v &= ~(WMAC_RF_BUSY | WMAC_RF_DATA_MASK);
+            v |= s->wmac_rf[regnum];
+        }
+
+        s->wmac_regs[addr >> 2] = v;
+        return;
+    }
 
     if (addr == WMAC_BBP_CSR_CFG && (v & WMAC_BBP_BUSY)) {
         unsigned regnum = (v & WMAC_BBP_REGNUM_MASK) >> 8;
