@@ -210,16 +210,180 @@ static void rt3883_fe_reset(RT3883F9K1103State *s)
     memset(s->fe_regs, 0, sizeof(s->fe_regs));
 }
 
+static uint32_t rt3883_pci_cfg_read(RT3883F9K1103State *s, uint32_t address)
+{
+    unsigned bus, slot, func, reg;
+
+    if (!(address & PCI_CFG_ENABLE)) {
+        return 0xffffffffU;
+    }
+
+    bus = (address >> 16) & 0xff;
+    slot = (address >> 11) & 0x1f;
+    func = (address >> 8) & 0x7;
+    reg = (address & 0xfc) >> 2;
+
+    if (func != 0 || reg >= ARRAY_SIZE(s->pcie_bridge_cfg)) {
+        return 0xffffffffU;
+    }
+
+    if (bus == 0 && slot == PCI_BRIDGE_SLOT) {
+        if (reg == (0x14 >> 2) && s->pcie_bridge_bar1_probe) {
+            return 0xffff0000U;
+        }
+        return s->pcie_bridge_cfg[reg];
+    }
+
+    if (bus == PCI_ENDPOINT_BUS && slot == PCI_ENDPOINT_SLOT) {
+        if (reg == (0x10 >> 2) && s->rt3091_bar0_probe) {
+            return 0xffff0000U;
+        }
+        return s->rt3091_cfg[reg];
+    }
+
+    return 0xffffffffU;
+}
+
+static void rt3883_pci_cfg_write(RT3883F9K1103State *s,
+                                  uint32_t address, uint32_t value)
+{
+    unsigned bus, slot, func, reg;
+
+    if (!(address & PCI_CFG_ENABLE)) {
+        return;
+    }
+
+    bus = (address >> 16) & 0xff;
+    slot = (address >> 11) & 0x1f;
+    func = (address >> 8) & 0x7;
+    reg = (address & 0xfc) >> 2;
+
+    if (func != 0 || reg >= ARRAY_SIZE(s->pcie_bridge_cfg)) {
+        return;
+    }
+
+    if (bus == 0 && slot == PCI_BRIDGE_SLOT) {
+        if (reg == (0x14 >> 2)) {
+            s->pcie_bridge_bar1_probe = value == 0xffffffffU;
+            if (!s->pcie_bridge_bar1_probe) {
+                s->pcie_bridge_cfg[reg] = value & 0xffff0000U;
+            }
+            return;
+        }
+        s->pcie_bridge_cfg[reg] = value;
+        return;
+    }
+
+    if (bus == PCI_ENDPOINT_BUS && slot == PCI_ENDPOINT_SLOT) {
+        if (reg == (0x10 >> 2)) {
+            s->rt3091_bar0_probe = value == 0xffffffffU;
+            if (!s->rt3091_bar0_probe) {
+                s->rt3091_cfg[reg] = value & 0xffff0000U;
+            }
+            return;
+        }
+        s->rt3091_cfg[reg] = value;
+    }
+}
+
+static uint64_t rt3883_pci_read(void *opaque, hwaddr addr, unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+
+    if (addr == PCI_REG_CFGADDR) {
+        return s->pci_cfgaddr;
+    }
+    if (addr == PCI_REG_CFGDATA) {
+        return rt3883_pci_cfg_read(s, s->pci_cfgaddr);
+    }
+    if ((addr >> 2) < ARRAY_SIZE(s->pci_regs)) {
+        return s->pci_regs[addr >> 2];
+    }
+    return 0;
+}
+
+static void rt3883_pci_write(void *opaque, hwaddr addr,
+                             uint64_t val, unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+    uint32_t v = val;
+
+    if (addr == PCI_REG_CFGADDR) {
+        s->pci_cfgaddr = v;
+        s->pci_regs[addr >> 2] = v;
+        return;
+    }
+    if (addr == PCI_REG_CFGDATA) {
+        rt3883_pci_cfg_write(s, s->pci_cfgaddr, v);
+        return;
+    }
+    if ((addr >> 2) < ARRAY_SIZE(s->pci_regs)) {
+        s->pci_regs[addr >> 2] = v;
+    }
+}
+
+static uint64_t rt3883_rt3091_read(void *opaque, hwaddr addr, unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+    return ((addr >> 2) < ARRAY_SIZE(s->rt3091_regs)) ?
+        s->rt3091_regs[addr >> 2] : 0;
+}
+
+static void rt3883_rt3091_write(void *opaque, hwaddr addr,
+                                uint64_t val, unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+    if ((addr >> 2) < ARRAY_SIZE(s->rt3091_regs)) {
+        s->rt3091_regs[addr >> 2] = val;
+    }
+}
+
+static void rt3883_pci_reset(RT3883F9K1103State *s)
+{
+    memset(s->pci_regs, 0, sizeof(s->pci_regs));
+    memset(s->rt3091_regs, 0, sizeof(s->rt3091_regs));
+    memset(s->pcie_bridge_cfg, 0, sizeof(s->pcie_bridge_cfg));
+    memset(s->rt3091_cfg, 0, sizeof(s->rt3091_cfg));
+
+    s->pci_cfgaddr = 0;
+    s->pcie_bridge_bar1_probe = false;
+    s->rt3091_bar0_probe = false;
+
+    /* PCIe link-up evidence: physical F9K1103 enumerates bus 1 RT3091. */
+    s->pci_regs[PCI_REG_STATUS_PCIE >> 2] = 1;
+
+    /* RT3883 internal PCIe bridge, matching physical enumeration 1814:0802. */
+    s->pcie_bridge_cfg[0x00 >> 2] =
+        (PCI_DEVICE_RT3883_BRIDGE << 16) | PCI_VENDOR_RALINK;
+    s->pcie_bridge_cfg[0x04 >> 2] = 0x00100000U;
+    s->pcie_bridge_cfg[0x08 >> 2] = 0x06040001U;
+    s->pcie_bridge_cfg[0x0c >> 2] = 0x00010000U;
+    s->pcie_bridge_cfg[0x14 >> 2] = 0x20100000U;
+    s->pcie_bridge_cfg[0x34 >> 2] = 0x00000040U;
+    s->pcie_bridge_cfg[0x40 >> 2] = 0x5a000001U;
+
+    /* Physical PCIe endpoint: Ralink RT3091/3092 family, class 0x028000. */
+    s->rt3091_cfg[0x00 >> 2] =
+        (PCI_DEVICE_RT3091 << 16) | PCI_VENDOR_RALINK;
+    s->rt3091_cfg[0x04 >> 2] = 0x00100000U;
+    s->rt3091_cfg[0x08 >> 2] = 0x02800000U;
+    s->rt3091_cfg[0x10 >> 2] = 0;
+    s->rt3091_cfg[0x34 >> 2] = 0x00000040U;
+    s->rt3091_cfg[0x40 >> 2] = 0x48000001U;
+}
+
 static void rt3883_device_reset_state(RT3883F9K1103State *s)
 {
     memset(s->soc_regs, 0, sizeof(s->soc_regs));
     rt3883_fe_reset(s);
+    rt3883_pci_reset(s);
     s->uart_rx_r = s->uart_rx_w = 0;
     rt3883_spi_controller_reset(s);
 
     /* RT3883 / F9K1103 source + physical boot evidence. */
     s->soc_regs[0x00 >> 2] = 0x38335452;
     s->soc_regs[0x04 >> 2] = 0x20203338;
+    s->soc_regs[SYSCTL_REVID_OFF >> 2] = 0x00000105U;
     s->soc_regs[SYSCTL_SYSCFG0_OFF >> 2] = F9K1103_SYSCFG0_EVIDENCE;
     /*
      * Keep all output latches high at reset.  Active-low button state is
