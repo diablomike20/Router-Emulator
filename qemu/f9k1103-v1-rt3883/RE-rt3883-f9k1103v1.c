@@ -26,7 +26,9 @@
 #define RT3883_FE_BASE           0x10100000ULL
 #define RT3883_FE_SIZE           0x00010000ULL
 #define RT3883_PCI_BASE          0x10140000ULL
-#define RT3883_PCI_SIZE          0x00010000ULL
+#define RT3883_PCI_SIZE          0x00020000ULL
+#define RT3883_PCI_IO_BASE       0x10160000ULL
+#define RT3883_PCI_IO_SIZE       0x00010000ULL
 #define RT3883_PCI_MEM_BASE      0x20000000ULL
 #define RT3883_PCI_MEM_SIZE      0x00010000ULL
 #define RT3883_FLASH_BASE        0x1c000000ULL
@@ -102,7 +104,7 @@
 #define PCI_DEVICE_RT3091        0x3091
 
 typedef struct RT3883F9K1103State {
-    MemoryRegion soc_mmio, fe_mmio, pci_mmio, rt3091_mmio;
+    MemoryRegion soc_mmio, fe_mmio, pci_mmio, pci_io_mr, rt3091_mmio;
     MemoryRegion flash_mr, ram_mirror;
     CharBackend chr;
     uint32_t soc_regs[RT3883_SOC_SIZE / 4];
@@ -660,6 +662,11 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_init_io(&s->pci_mmio, OBJECT(machine), &rt3883_pci_ops, s,
                           "rt3883.pci-controller", RT3883_PCI_SIZE);
     memory_region_add_subregion(sysmem, RT3883_PCI_BASE, &s->pci_mmio);
+
+    memory_region_init_ram_nomigrate(&s->pci_io_mr, OBJECT(machine),
+                                     "rt3883.pci-io",
+                                     RT3883_PCI_IO_SIZE, &error_fatal);
+    memory_region_add_subregion(sysmem, RT3883_PCI_IO_BASE, &s->pci_io_mr);
 
     /*
      * Fixed initial PCIe memory aperture for the physical RT3091 endpoint.
