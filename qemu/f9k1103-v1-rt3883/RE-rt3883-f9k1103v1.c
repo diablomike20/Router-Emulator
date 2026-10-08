@@ -10,10 +10,12 @@
 #include "qapi/error.h"
 #include "qemu/error-report.h"
 #include "chardev/char-fe.h"
+#include "exec/address-spaces.h"
 #include "hw/boards.h"
 #include "hw/char/serial.h"
 #include "hw/clock.h"
 #include "hw/loader.h"
+#include "hw/irq.h"
 #include "hw/mips/mips.h"
 #include "hw/qdev-properties.h"
 #include "hw/sysbus.h"
@@ -116,6 +118,33 @@
 #define PCI_REG_STATUS1          0x2050
 
 /*
+ * RT3883 Frame Engine / legacy PDMA register contract used by the
+ * OpenWrt/LEDE 4.4 mtk_soc_eth driver.
+ */
+#define FE_INT_STATUS            0x0010
+#define FE_INT_ENABLE            0x0014
+#define FE_PDMA_GLO_CFG          0x0100
+#define FE_PDMA_RST_CFG          0x0104
+#define FE_TX_BASE_PTR0          0x0110
+#define FE_TX_MAX_CNT0           0x0114
+#define FE_TX_CTX_IDX0           0x0118
+#define FE_TX_DTX_IDX0           0x011c
+#define FE_RX_BASE_PTR0          0x0130
+#define FE_RX_MAX_CNT0           0x0134
+#define FE_RX_CALC_IDX0          0x0138
+#define FE_RX_DRX_IDX0           0x013c
+
+#define FE_PST_DTX_IDX0          (1U << 0)
+#define FE_PST_DRX_IDX0          (1U << 16)
+#define FE_TX_DMA_EN             (1U << 0)
+#define FE_RX_DMA_EN             (1U << 2)
+#define FE_TX_WB_DDONE           (1U << 6)
+#define FE_TX_DONE_INT0          (1U << 8)
+#define FE_TX_DONE_INT_MASK      (0xFU << 8)
+#define FE_TX_DESC_SIZE          16U
+#define FE_TX_DMA_DONE           (1U << 31)
+
+/*
  * RT3883 integrated WiSoC MAC.  OpenWrt RT3883 DTS maps a 0x40000-byte
  * window at 0x10180000.  rt2800soc identifies the device through MAC_CSR0
  * at +0x1000; physical RT3883/OpenWrt boots consistently report chipset
@@ -188,6 +217,7 @@ typedef struct RT3883F9K1103State {
     uint32_t wmac_regs[RT3883_WMAC_SIZE / 4];
     uint8_t wmac_bbp[256];
     uint8_t wmac_rf[64];
+    qemu_irq fe_irq;
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -289,9 +319,81 @@ static void rt3883_spi_controller_reset(RT3883F9K1103State *s)
     rt3883_spi_reset_transaction(s);
 }
 
+static void rt3883_fe_update_irq(RT3883F9K1103State *s)
+{
+    uint32_t status = s->fe_regs[FE_INT_STATUS >> 2];
+    uint32_t enable = s->fe_regs[FE_INT_ENABLE >> 2];
+
+    if (s->fe_irq) {
+        qemu_set_irq(s->fe_irq, !!(status & enable));
+    }
+}
+
 static void rt3883_fe_reset(RT3883F9K1103State *s)
 {
     memset(s->fe_regs, 0, sizeof(s->fe_regs));
+    rt3883_fe_update_irq(s);
+}
+
+static bool rt3883_fe_tx_desc_complete(hwaddr addr)
+{
+    uint8_t desc[FE_TX_DESC_SIZE];
+    uint32_t txd2;
+
+    if (address_space_read(&address_space_memory, addr,
+                           MEMTXATTRS_UNSPECIFIED,
+                           desc, sizeof(desc)) != MEMTX_OK) {
+        return false;
+    }
+
+    txd2 = ldl_le_p(desc + 4);
+    txd2 |= FE_TX_DMA_DONE;
+    stl_le_p(desc + 4, txd2);
+
+    return address_space_write(&address_space_memory, addr,
+                               MEMTXATTRS_UNSPECIFIED,
+                               desc, sizeof(desc)) == MEMTX_OK;
+}
+
+static void rt3883_fe_tx_kick(RT3883F9K1103State *s)
+{
+    uint32_t glo = s->fe_regs[FE_PDMA_GLO_CFG >> 2];
+    uint32_t base = s->fe_regs[FE_TX_BASE_PTR0 >> 2];
+    uint32_t count = s->fe_regs[FE_TX_MAX_CNT0 >> 2];
+    uint32_t ctx = s->fe_regs[FE_TX_CTX_IDX0 >> 2];
+    uint32_t dtx = s->fe_regs[FE_TX_DTX_IDX0 >> 2];
+    uint32_t done = 0;
+
+    if (!(glo & FE_TX_DMA_EN) || !count || count > 4096) {
+        return;
+    }
+
+    ctx %= count;
+    dtx %= count;
+
+    /*
+     * M1 DMA-lifecycle model: consume every descriptor handed to hardware by
+     * advancing DTX to CTX and writing back TX_DMA_DONE.  Packet bytes are not
+     * yet forwarded to a host NIC; this closes the real guest driver's
+     * descriptor/completion contract without claiming dataplane fidelity.
+     */
+    while (dtx != ctx && done < count) {
+        hwaddr desc_addr = (hwaddr)base + (hwaddr)dtx * FE_TX_DESC_SIZE;
+
+        if (!rt3883_fe_tx_desc_complete(desc_addr)) {
+            break;
+        }
+
+        dtx = (dtx + 1) % count;
+        done++;
+    }
+
+    s->fe_regs[FE_TX_DTX_IDX0 >> 2] = dtx;
+
+    if (done) {
+        s->fe_regs[FE_INT_STATUS >> 2] |= FE_TX_DONE_INT0;
+        rt3883_fe_update_irq(s);
+    }
 }
 
 static void rt3883_pci_reset(RT3883F9K1103State *s)
@@ -746,7 +848,42 @@ static uint64_t rt3883_fe_read(void *opaque, hwaddr addr, unsigned size)
 static void rt3883_fe_write(void *opaque, hwaddr addr, uint64_t val, unsigned size)
 {
     RT3883F9K1103State *s = opaque;
-    if ((addr >> 2) < ARRAY_SIZE(s->fe_regs)) s->fe_regs[addr >> 2] = val;
+    uint32_t v = (uint32_t)val;
+
+    if ((addr >> 2) >= ARRAY_SIZE(s->fe_regs)) {
+        return;
+    }
+
+    if (addr == FE_INT_STATUS) {
+        /* Legacy FE interrupt status is write-one-to-clear. */
+        s->fe_regs[FE_INT_STATUS >> 2] &= ~v;
+        rt3883_fe_update_irq(s);
+        return;
+    }
+
+    if (addr == FE_INT_ENABLE) {
+        s->fe_regs[FE_INT_ENABLE >> 2] = v;
+        rt3883_fe_update_irq(s);
+        return;
+    }
+
+    if (addr == FE_PDMA_RST_CFG) {
+        if (v & FE_PST_DTX_IDX0) {
+            s->fe_regs[FE_TX_DTX_IDX0 >> 2] = 0;
+        }
+        if (v & FE_PST_DRX_IDX0) {
+            s->fe_regs[FE_RX_DRX_IDX0 >> 2] = 0;
+        }
+        /* Reset bits are command strobes. */
+        s->fe_regs[FE_PDMA_RST_CFG >> 2] = 0;
+        return;
+    }
+
+    s->fe_regs[addr >> 2] = v;
+
+    if (addr == FE_TX_CTX_IDX0 || addr == FE_PDMA_GLO_CFG) {
+        rt3883_fe_tx_kick(s);
+    }
 }
 
 static uint64_t rt3883_pci_read(void *opaque, hwaddr addr, unsigned size)
@@ -905,6 +1042,12 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     qemu_register_reset(rt3883_cpu_reset, reset);
     error_report("RT3883_M1_STAGE=irq_init");
     cpu_mips_irq_init_cpu(cpu);
+    /*
+     * rt3883.dtsi wires the Frame Engine directly to CPU interrupt 5.
+     * Keep a level IRQ so FE_INT_ENABLE and W1C FE_INT_STATUS semantics can
+     * drive the guest's real NAPI path.
+     */
+    s->fe_irq = cpu->env.irq[5];
     error_report("RT3883_M1_STAGE=cp0_clock_init");
     cpu_mips_clock_init(cpu);
     error_report("RT3883_M1_STAGE=ram_map");
