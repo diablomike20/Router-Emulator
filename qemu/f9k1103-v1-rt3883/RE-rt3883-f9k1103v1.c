@@ -27,6 +27,8 @@
 #define RT3883_FE_SIZE           0x00010000ULL
 #define RT3883_PCI_BASE          0x10140000ULL
 #define RT3883_PCI_SIZE          0x00020000ULL
+#define RT3883_USBHOST_BASE      0x101c0000ULL
+#define RT3883_USBHOST_SIZE      0x00040000ULL
 #define RT3883_FLASH_BASE        0x1c000000ULL
 #define RT3883_FLASH_SIZE        (8 * MiB)
 #define RT3883_UBOOT_LOAD_PHYS   0x00200000ULL
@@ -71,6 +73,7 @@
 #define SYSCTL_RSTCTRL_SYS_RST   (1U << 0)
 #define SYSCTL_RSTCTRL_SPI_RST   (1U << 18)
 #define SYSCTL_RSTCTRL_FE_RST    (1U << 21)
+#define SYSCTL_RSTCTRL_UHST_RST   (1U << 22)
 #define SYSCTL_RSTCTRL_PCIE_RST  (1U << 23)
 #define SYSCTL_RSTCTRL_PCI_RST   (1U << 24)
 
@@ -112,11 +115,12 @@ typedef enum RT3883SMIStage {
 } RT3883SMIStage;
 
 typedef struct RT3883F9K1103State {
-    MemoryRegion soc_mmio, fe_mmio, pci_mmio, flash_mr, ram_mirror;
+    MemoryRegion soc_mmio, fe_mmio, pci_mmio, usbhost_mmio, flash_mr, ram_mirror;
     CharBackend chr;
     uint32_t soc_regs[RT3883_SOC_SIZE / 4];
     uint32_t fe_regs[RT3883_FE_SIZE / 4];
     uint32_t pci_regs[RT3883_PCI_SIZE / 4];
+    uint32_t usbhost_regs[RT3883_USBHOST_SIZE / 4];
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -232,6 +236,18 @@ static void rt3883_pci_reset(RT3883F9K1103State *s)
      * than discovering a fabricated device.
      */
     s->pci_regs[PCI_REG_STATUS1 >> 2] = 0;
+}
+
+static void rt3883_usbhost_reset(RT3883F9K1103State *s)
+{
+    /*
+     * M1 initially exposes the documented RT3883 USB-host window as an
+     * inert, zero-reset register block.  This is deliberately a no-device
+     * shell, not a claim of EHCI behavioural fidelity.  It prevents an
+     * unmapped KSEG1 access from killing Linux and lets the guest reveal
+     * which EHCI semantics are actually required next.
+     */
+    memset(s->usbhost_regs, 0, sizeof(s->usbhost_regs));
 }
 
 static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
@@ -435,6 +451,7 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     memset(s->soc_regs, 0, sizeof(s->soc_regs));
     rt3883_fe_reset(s);
     rt3883_pci_reset(s);
+    rt3883_usbhost_reset(s);
     memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
     memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
     rt3883_smi_end(s);
@@ -593,6 +610,9 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
         if (v & SYSCTL_RSTCTRL_FE_RST) {
             rt3883_fe_reset(s);
         }
+        if (v & SYSCTL_RSTCTRL_UHST_RST) {
+            rt3883_usbhost_reset(s);
+        }
         if (v & (SYSCTL_RSTCTRL_PCIE_RST | SYSCTL_RSTCTRL_PCI_RST)) {
             rt3883_pci_reset(s);
         }
@@ -700,6 +720,30 @@ static const MemoryRegionOps rt3883_pci_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
 };
 
+static uint64_t rt3883_usbhost_read(void *opaque, hwaddr addr,
+                                       unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+    return ((addr >> 2) < ARRAY_SIZE(s->usbhost_regs)) ?
+           s->usbhost_regs[addr >> 2] : 0;
+}
+
+static void rt3883_usbhost_write(void *opaque, hwaddr addr, uint64_t val,
+                                 unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+    if ((addr >> 2) < ARRAY_SIZE(s->usbhost_regs)) {
+        s->usbhost_regs[addr >> 2] = (uint32_t)val;
+    }
+}
+
+static const MemoryRegionOps rt3883_usbhost_ops = {
+    .read = rt3883_usbhost_read, .write = rt3883_usbhost_write,
+    .valid.min_access_size = 1, .valid.max_access_size = 4,
+    .impl.min_access_size = 1, .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+
 static void rt3883_cpu_reset(void *opaque)
 {
     RT3883ResetData *r = opaque;
@@ -771,6 +815,13 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_init_io(&s->pci_mmio, OBJECT(machine), &rt3883_pci_ops, s,
                           "rt3883.pci-host", RT3883_PCI_SIZE);
     memory_region_add_subregion(sysmem, RT3883_PCI_BASE, &s->pci_mmio);
+
+    error_report("RT3883_M1_STAGE=usbhost_mmio");
+    memory_region_init_io(&s->usbhost_mmio, OBJECT(machine),
+                          &rt3883_usbhost_ops, s,
+                          "rt3883.usb-host", RT3883_USBHOST_SIZE);
+    memory_region_add_subregion(sysmem, RT3883_USBHOST_BASE,
+                                &s->usbhost_mmio);
 
     error_report("RT3883_M1_STAGE=flash_map");
     memory_region_init_ram_nomigrate(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
