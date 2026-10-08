@@ -31,6 +31,8 @@
 #define RT3883_USBHOST_SIZE      0x00040000ULL
 #define RT3883_WMAC_BASE         0x10180000ULL
 #define RT3883_WMAC_SIZE         0x00040000ULL
+#define RT3883_WMAC_MAC_CSR0_OFF 0x00001000ULL
+#define F9K1103_WMAC_MAC_CSR0    0x38830400U
 #define RT3883_FLASH_BASE        0x1c000000ULL
 #define RT3883_FLASH_SIZE        (8 * MiB)
 #define RT3883_UBOOT_LOAD_PHYS   0x00200000ULL
@@ -338,12 +340,14 @@ static void rt3883_wmac_reset(RT3883F9K1103State *s)
 {
     /*
      * The RT3883 integrated 5 GHz MAC/BBP occupies 0x10180000..0x101bffff.
-     * M1 first exposes an honest reset-zero shell: no fabricated radio ID,
-     * EEPROM state, DMA engine or RF activity.  This converts an unmapped
-     * bus exception into normal driver-visible register reads so rt2800soc
-     * can reveal the exact semantics it needs next.
+     * M1 models the physical identity already proven by target dmesg:
+     * RT3883, revision 0x0400.  MAC_CSR0 layout is chipset[31:16] and
+     * revision[15:0], hence 0x38830400.  No DMA/BBP/RF behavior is invented
+     * here; the remaining registers still start at reset-zero so the exact
+     * driver can reveal the next semantics it requires.
      */
     memset(s->wmac_regs, 0, sizeof(s->wmac_regs));
+    s->wmac_regs[RT3883_WMAC_MAC_CSR0_OFF >> 2] = F9K1103_WMAC_MAC_CSR0;
 }
 
 static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
@@ -964,6 +968,12 @@ static void rt3883_wmac_write(void *opaque, hwaddr addr, uint64_t val,
                               unsigned size)
 {
     RT3883F9K1103State *s = opaque;
+
+    /* MAC_CSR0 is hardware identity, not writable configuration state. */
+    if (addr == RT3883_WMAC_MAC_CSR0_OFF) {
+        return;
+    }
+
     if ((addr >> 2) < ARRAY_SIZE(s->wmac_regs)) {
         s->wmac_regs[addr >> 2] = (uint32_t)val;
     }
