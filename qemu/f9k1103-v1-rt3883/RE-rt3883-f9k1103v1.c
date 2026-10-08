@@ -489,6 +489,10 @@ static bool rt3883_fe_rx_inject(RT3883F9K1103State *s,
                                 const uint8_t *buf, size_t size)
 {
     uint32_t base = s->fe_regs[FE_RX_BASE_PTR0 >> 2];
+
+    error_report("RT3883_FE_RX_STAGE=enter size=%zu base=%08x max=%u next=%u glo=%08x",
+                 size, base, s->fe_regs[FE_RX_MAX_CNT0 >> 2],
+                 s->fe_rx_next, s->fe_regs[FE_PDMA_GLO_CFG >> 2]);
     uint32_t count = s->fe_regs[FE_RX_MAX_CNT0 >> 2];
     uint8_t desc[FE_RX_DESC_SIZE];
     uint8_t frame[NET_BUFSIZE];
@@ -497,6 +501,7 @@ static bool rt3883_fe_rx_inject(RT3883F9K1103State *s,
     hwaddr desc_addr;
 
     if (!rt3883_fe_rx_desc_available(s)) {
+        error_report("RT3883_FE_RX_STAGE=no_descriptor");
         return false;
     }
 
@@ -507,14 +512,20 @@ static bool rt3883_fe_rx_inject(RT3883F9K1103State *s,
 
     idx = s->fe_rx_next % count;
     desc_addr = (hwaddr)base + (hwaddr)idx * FE_RX_DESC_SIZE;
+    error_report("RT3883_FE_RX_STAGE=desc idx=%u addr=%" HWADDR_PRIx " count=%u frame_len=%zu",
+                 idx, desc_addr, count, frame_len);
     if (!rt3883_fe_mem_read(desc_addr, desc, sizeof(desc))) {
         return false;
     }
 
     rxd1 = ldl_le_p(desc);
+    rxd2 = ldl_le_p(desc + 4);
+    error_report("RT3883_FE_RX_STAGE=buffer rxd1=%08x old_rxd2=%08x", rxd1, rxd2);
     if (!rxd1 || !rt3883_fe_mem_write(rxd1, frame, frame_len)) {
+        error_report("RT3883_FE_RX_STAGE=buffer_write_failed rxd1=%08x", rxd1);
         return false;
     }
+    error_report("RT3883_FE_RX_STAGE=buffer_written");
 
     rxd2 = FE_RX_DMA_DONE |
            (((uint32_t)frame_len & FE_RX_DMA_BUF_LEN) << 16);
@@ -522,13 +533,19 @@ static bool rt3883_fe_rx_inject(RT3883F9K1103State *s,
     stl_le_p(desc + 8, 0);
     stl_le_p(desc + 12, 0);
     if (!rt3883_fe_mem_write(desc_addr, desc, sizeof(desc))) {
+        error_report("RT3883_FE_RX_STAGE=desc_write_failed");
         return false;
     }
+    error_report("RT3883_FE_RX_STAGE=desc_written new_rxd2=%08x", rxd2);
 
     s->fe_regs[FE_RX_DRX_IDX0 >> 2] = idx;
     s->fe_rx_next = (idx + 1) % count;
     s->fe_regs[FE_INT_STATUS >> 2] |= FE_RX_DONE_INT0;
+    error_report("RT3883_FE_RX_STAGE=irq_raise status=%08x enable=%08x",
+                 s->fe_regs[FE_INT_STATUS >> 2],
+                 s->fe_regs[FE_INT_ENABLE >> 2]);
     rt3883_fe_update_irq(s);
+    error_report("RT3883_FE_RX_STAGE=complete");
     return true;
 }
 
