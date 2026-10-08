@@ -25,6 +25,10 @@
 #define RT3883_SOC_SIZE          0x00010000ULL
 #define RT3883_FE_BASE           0x10100000ULL
 #define RT3883_FE_SIZE           0x00010000ULL
+#define RT3883_PCI_BASE          0x10140000ULL
+#define RT3883_PCI_SIZE          0x00010000ULL
+#define RT3883_PCI_MEM_BASE      0x20000000ULL
+#define RT3883_PCI_MEM_SIZE      0x00010000ULL
 #define RT3883_FLASH_BASE        0x1c000000ULL
 #define RT3883_FLASH_SIZE        (8 * MiB)
 #define RT3883_UBOOT_LOAD_PHYS   0x00200000ULL
@@ -50,6 +54,7 @@
 #define F9K1103_RESET_GPIO       25
 #define F9K1103_WPS_GPIO         26
 
+#define SYSCTL_REVID_OFF         0x000c
 #define SYSCTL_SYSCFG0_OFF       0x0010
 #define SYSCTL_RSTCTRL_OFF       0x0034
 #define SYSCTL_RSTCTRL_SYS_RST   (1U << 0)
@@ -78,11 +83,36 @@
 #define SPI_CMD_SE               0xd8
 #define SPI_CMD_RDID             0x9f
 
+#define PCI_REG_PCICFG           0x0000
+#define PCI_REG_PCIINT           0x0008
+#define PCI_REG_PCIENA           0x000c
+#define PCI_REG_CFGADDR          0x0020
+#define PCI_REG_CFGDATA          0x0024
+#define PCI_REG_MEMBASE          0x0028
+#define PCI_REG_IOBASE           0x002c
+#define PCI_REG_ARBCTL           0x0080
+#define PCI_REG_STATUS_PCIE      0x2050
+#define PCI_CFG_ENABLE           0x80000000U
+#define PCI_BRIDGE_SLOT          1
+#define PCI_ENDPOINT_BUS         1
+#define PCI_ENDPOINT_SLOT        0
+#define PCI_VENDOR_RALINK        0x1814
+#define PCI_DEVICE_RT3883_BRIDGE 0x0802
+#define PCI_DEVICE_RT3091        0x3091
+
 typedef struct RT3883F9K1103State {
-    MemoryRegion soc_mmio, fe_mmio, flash_mr, ram_mirror;
+    MemoryRegion soc_mmio, fe_mmio, pci_mmio, rt3091_mmio;
+    MemoryRegion flash_mr, ram_mirror;
     CharBackend chr;
     uint32_t soc_regs[RT3883_SOC_SIZE / 4];
     uint32_t fe_regs[RT3883_FE_SIZE / 4];
+    uint32_t pci_regs[RT3883_PCI_SIZE / 4];
+    uint32_t rt3091_regs[RT3883_PCI_MEM_SIZE / 4];
+    uint32_t pci_cfgaddr;
+    uint32_t pcie_bridge_cfg[64];
+    uint32_t rt3091_cfg[64];
+    bool pcie_bridge_bar1_probe;
+    bool rt3091_bar0_probe;
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
