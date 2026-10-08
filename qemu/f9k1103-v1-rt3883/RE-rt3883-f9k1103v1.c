@@ -234,6 +234,7 @@ typedef struct RT3883F9K1103State {
     uint8_t fe_tx_frame[NET_BUFSIZE];
     size_t fe_tx_frame_len;
     bool fe_tx_needs_csum;
+    unsigned fe_rx_debug_count;
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -351,6 +352,7 @@ static void rt3883_fe_reset(RT3883F9K1103State *s)
     s->fe_rx_next = 0;
     s->fe_tx_frame_len = 0;
     s->fe_tx_needs_csum = false;
+    s->fe_rx_debug_count = 0;
     rt3883_fe_update_irq(s);
 }
 
@@ -552,8 +554,29 @@ static bool rt3883_fe_rx_inject(RT3883F9K1103State *s,
 static bool rt3883_fe_can_receive(NetClientState *nc)
 {
     RT3883F9K1103State *s = qemu_get_nic_opaque(nc);
+    uint32_t glo = s->fe_regs[FE_PDMA_GLO_CFG >> 2];
+    uint32_t base = s->fe_regs[FE_RX_BASE_PTR0 >> 2];
+    uint32_t count = s->fe_regs[FE_RX_MAX_CNT0 >> 2];
+    uint32_t idx = count ? (s->fe_rx_next % count) : 0;
+    uint32_t rxd2 = 0xffffffffU;
+    uint8_t desc[FE_RX_DESC_SIZE];
+    bool available;
 
-    return rt3883_fe_rx_desc_available(s);
+    available = rt3883_fe_rx_desc_available(s);
+
+    if (s->fe_rx_debug_count < 32) {
+        if (base && count && count <= 4096 &&
+            rt3883_fe_mem_read((hwaddr)base + (hwaddr)idx * FE_RX_DESC_SIZE,
+                               desc, sizeof(desc))) {
+            rxd2 = ldl_le_p(desc + 4);
+        }
+        error_report("RT3883_FE_RX_CAN=%u available=%u glo=%08x base=%08x max=%u next=%u idx=%u rxd2=%08x",
+                     s->fe_rx_debug_count, available, glo, base, count,
+                     s->fe_rx_next, idx, rxd2);
+        s->fe_rx_debug_count++;
+    }
+
+    return available;
 }
 
 static ssize_t rt3883_fe_receive(NetClientState *nc,
