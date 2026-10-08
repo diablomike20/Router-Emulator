@@ -37,6 +37,13 @@ jobs:
           set -o pipefail
           chmod +x scripts/RE-smoke-qemu-f9k1103-v1-rt3883.sh
           scripts/RE-smoke-qemu-f9k1103-v1-rt3883.sh "$RUNNER_TEMP/rt3883-qemu/build/qemu-system-mipsel" "$RUNNER_TEMP/rt3883-smoke" | tee "$RUNNER_TEMP/RE-qemu-smoke.log"
+      - name: Collect Slirp runtime
+        run: |
+          set -e
+          SLIRP_SO="$(ldconfig -p | awk '/libslirp\.so\.0/{print $NF; exit}')"
+          test -n "$SLIRP_SO"
+          cp -L "$SLIRP_SO" "$RUNNER_TEMP/libslirp.so.0"
+          sha256sum "$RUNNER_TEMP/libslirp.so.0" > "$RUNNER_TEMP/RE-libslirp.sha256"
       - name: Bundle Slirp runtime dependency
         run: |
           set -euo pipefail
@@ -71,6 +78,8 @@ jobs:
             ${{ runner.temp }}/RE-qemu-build.log
             ${{ runner.temp }}/RE-qemu-smoke.log
             ${{ runner.temp }}/RE-PROVENANCE.txt
+            ${{ runner.temp }}/libslirp.so.0
+            ${{ runner.temp }}/RE-libslirp.sha256
             ${{ runner.temp }}/rt3883-qemu/build/qemu-system-mipsel
             ${{ runner.temp }}/rt3883-smoke/serial.log
             ${{ runner.temp }}/rt3883-smoke/probe.bin
