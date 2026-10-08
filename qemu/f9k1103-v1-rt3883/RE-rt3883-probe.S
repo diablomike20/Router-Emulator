@@ -176,6 +176,39 @@ _start:
     nop
 
     /*
+     * RT3883 PCIe host controller: link-ready status plus the exact
+     * physical F9K1103 bridge/endpoint identities.
+     */
+    lui $s5,0xb014
+    lw $t1,0x2050($s5)
+    andi $t1,$t1,0x0001
+    beqz $t1,pci_link_fail
+    nop
+    la $a0,msg_pci_link
+    jal uart_puts
+    nop
+
+    li $t0,0x80000800
+    sw $t0,0x20($s5)
+    lw $t1,0x24($s5)
+    li $t2,0x08021814
+    bne $t1,$t2,pci_bridge_fail
+    nop
+    la $a0,msg_pci_bridge
+    jal uart_puts
+    nop
+
+    li $t0,0x80010000
+    sw $t0,0x20($s5)
+    lw $t1,0x24($s5)
+    li $t2,0x30911814
+    bne $t1,$t2,pci_endpoint_fail
+    nop
+    la $a0,msg_pci_endpoint
+    jal uart_puts
+    nop
+
+    /*
      * Exact Belkin reset helper writes literal 1 to 0xb0000034.
      */
     lui $t0,0x8001
@@ -229,6 +262,24 @@ syscfg_fail:
     nop
     b hang
     nop
+pci_endpoint_fail:
+    la $a0,msg_pci_endpoint_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
+pci_bridge_fail:
+    la $a0,msg_pci_bridge_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
+pci_link_fail:
+    la $a0,msg_pci_link_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 spi_rdsr_fail:
     la $a0,msg_spi_rdsr_fail
     jal uart_puts
@@ -266,6 +317,9 @@ msg_ram_mirror: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
+msg_pci_link: .asciz "RT3883_F9K1103V1_PCIE_LINK_GATE=PASS\n"
+msg_pci_bridge: .asciz "RT3883_F9K1103V1_PCIE_BRIDGE_1814_0802_GATE=PASS\n"
+msg_pci_endpoint: .asciz "RT3883_F9K1103V1_PCIE_RT3091_1814_3091_GATE=PASS\n"
 msg_system_reset: .asciz "RT3883_F9K1103V1_SYSTEM_RESET_GATE=PASS\n"
 msg_pass: .asciz "RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS\n"
 msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
@@ -275,3 +329,6 @@ msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
 msg_ram_mirror_fail: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
 msg_spi_rdsr_fail: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=FAIL\n"
+msg_pci_link_fail: .asciz "RT3883_F9K1103V1_PCIE_LINK_GATE=FAIL\n"
+msg_pci_bridge_fail: .asciz "RT3883_F9K1103V1_PCIE_BRIDGE_1814_0802_GATE=FAIL\n"
+msg_pci_endpoint_fail: .asciz "RT3883_F9K1103V1_PCIE_RT3091_1814_3091_GATE=FAIL\n"
