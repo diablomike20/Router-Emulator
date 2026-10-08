@@ -32,6 +32,8 @@
 #define RT3883_FE_SIZE           0x00010000ULL
 #define RT3883_PCI_BASE          0x10140000ULL
 #define RT3883_PCI_SIZE          0x00020000ULL
+#define RT3883_WMAC_BASE         0x10180000ULL
+#define RT3883_WMAC_SIZE         0x00040000ULL
 #define RT3883_EHCI_BASE         0x101c0000ULL
 #define RT3883_OHCI_BASE         0x101c1000ULL
 #define RT3883_FLASH_BASE        0x1c000000ULL
@@ -108,6 +110,15 @@
 #define PCI_REG_CFGDATA          0x0024
 #define PCI_REG_STATUS1          0x2050
 
+/*
+ * RT3883 integrated WiSoC MAC.  OpenWrt RT3883 DTS maps a 0x40000-byte
+ * window at 0x10180000.  rt2800soc identifies the device through MAC_CSR0
+ * at +0x1000; physical RT3883/OpenWrt boots consistently report chipset
+ * 0x3883 revision 0x0400.
+ */
+#define WMAC_MAC_CSR0            0x1000
+#define WMAC_MAC_CSR0_RT3883     0x38830400U
+
 #define TYPE_RT3883_EHCI "rt3883-ehci-usb"
 
 static void rt3883_ehci_class_init(ObjectClass *oc, void *data)
@@ -144,11 +155,12 @@ typedef enum RT3883SMIStage {
 } RT3883SMIStage;
 
 typedef struct RT3883F9K1103State {
-    MemoryRegion soc_mmio, fe_mmio, pci_mmio, flash_mr, ram_mirror;
+    MemoryRegion soc_mmio, fe_mmio, pci_mmio, wmac_mmio, flash_mr, ram_mirror;
     CharBackend chr;
     uint32_t soc_regs[RT3883_SOC_SIZE / 4];
     uint32_t fe_regs[RT3883_FE_SIZE / 4];
     uint32_t pci_regs[RT3883_PCI_SIZE / 4];
+    uint32_t wmac_regs[RT3883_WMAC_SIZE / 4];
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -260,6 +272,18 @@ static void rt3883_pci_reset(RT3883F9K1103State *s)
     memset(s->pci_regs, 0, sizeof(s->pci_regs));
     /* No fabricated downstream PCIe endpoint in M1. */
     s->pci_regs[PCI_REG_STATUS1 >> 2] = 0;
+}
+
+static void rt3883_wmac_reset(RT3883F9K1103State *s)
+{
+    memset(s->wmac_regs, 0, sizeof(s->wmac_regs));
+
+    /*
+     * Probe identity only.  Do not fabricate RF/BBP completion state here;
+     * later exact Linux execution determines which registers need real
+     * device semantics.
+     */
+    s->wmac_regs[WMAC_MAC_CSR0 >> 2] = WMAC_MAC_CSR0_RT3883;
 }
 
 static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
@@ -463,6 +487,7 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     memset(s->soc_regs, 0, sizeof(s->soc_regs));
     rt3883_fe_reset(s);
     rt3883_pci_reset(s);
+    rt3883_wmac_reset(s);
     memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
     memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
     rt3883_smi_end(s);
@@ -699,6 +724,24 @@ static void rt3883_pci_write(void *opaque, hwaddr addr, uint64_t val,
     }
 }
 
+static uint64_t rt3883_wmac_read(void *opaque, hwaddr addr, unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+
+    return ((addr >> 2) < ARRAY_SIZE(s->wmac_regs)) ?
+           s->wmac_regs[addr >> 2] : 0;
+}
+
+static void rt3883_wmac_write(void *opaque, hwaddr addr, uint64_t val,
+                              unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+
+    if ((addr >> 2) < ARRAY_SIZE(s->wmac_regs)) {
+        s->wmac_regs[addr >> 2] = (uint32_t)val;
+    }
+}
+
 static const MemoryRegionOps rt3883_soc_ops = {
     .read = rt3883_soc_read, .write = rt3883_soc_write,
     .valid.min_access_size = 1, .valid.max_access_size = 4,
@@ -713,6 +756,12 @@ static const MemoryRegionOps rt3883_fe_ops = {
 };
 static const MemoryRegionOps rt3883_pci_ops = {
     .read = rt3883_pci_read, .write = rt3883_pci_write,
+    .valid.min_access_size = 1, .valid.max_access_size = 4,
+    .impl.min_access_size = 1, .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+static const MemoryRegionOps rt3883_wmac_ops = {
+    .read = rt3883_wmac_read, .write = rt3883_wmac_write,
     .valid.min_access_size = 1, .valid.max_access_size = 4,
     .impl.min_access_size = 1, .impl.max_access_size = 4,
     .endianness = DEVICE_LITTLE_ENDIAN,
@@ -789,6 +838,11 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_init_io(&s->pci_mmio, OBJECT(machine), &rt3883_pci_ops, s,
                           "rt3883.pci-host", RT3883_PCI_SIZE);
     memory_region_add_subregion(sysmem, RT3883_PCI_BASE, &s->pci_mmio);
+
+    error_report("RT3883_M1_STAGE=wmac_mmio");
+    memory_region_init_io(&s->wmac_mmio, OBJECT(machine), &rt3883_wmac_ops, s,
+                          "rt3883.wmac", RT3883_WMAC_SIZE);
+    memory_region_add_subregion(sysmem, RT3883_WMAC_BASE, &s->wmac_mmio);
 
     error_report("RT3883_M1_STAGE=usb_host");
     DeviceState *ehci = qdev_new(TYPE_RT3883_EHCI);
