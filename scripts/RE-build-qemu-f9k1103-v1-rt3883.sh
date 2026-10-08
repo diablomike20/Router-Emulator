@@ -42,7 +42,8 @@ rm -rf "$QEMU_BUILD"; mkdir -p "$QEMU_BUILD"; cd "$QEMU_BUILD"
   --disable-png \
   --disable-sdl \
   --disable-gtk \
-  --disable-opengl
+  --disable-opengl \
+  --enable-slirp
 ninja qemu-system-mipsel
 BIN="$QEMU_BUILD/qemu-system-mipsel"
 "$BIN" -M help | grep -q 'rt3883-f9k1103v1'
