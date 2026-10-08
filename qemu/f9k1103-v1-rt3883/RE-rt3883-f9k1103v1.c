@@ -9,7 +9,7 @@
 #include "qemu/osdep.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
-#include "qemu/main-loop.h"
+#include "qemu/main-loop.h"\n#include "qemu/mem-reentrancy.h"
 #include "chardev/char-fe.h"
 #include "exec/address-spaces.h"
 #include "hw/boards.h"
@@ -231,6 +231,7 @@ typedef struct RT3883F9K1103State {
     qemu_irq fe_irq;
     NICState *fe_nic;
     NICConf fe_nic_conf;
+    MemReentrancyGuard fe_net_reentrancy_guard;
     QEMUBH *fe_rx_flush_bh;
     uint32_t fe_rx_next;
     uint8_t fe_tx_frame[NET_BUFSIZE];
@@ -1410,7 +1411,8 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     s->fe_nic_conf.peers.queues = 1;
     s->fe_nic_conf.peers.ncs[0] = qemu_find_netdev("net0");
     s->fe_nic = qemu_new_nic(&net_rt3883_fe_info, &s->fe_nic_conf,
-                             "rt3883-fe", "rt3883-fe", NULL, s);
+                             "rt3883-fe", "rt3883-fe",
+                             &s->fe_net_reentrancy_guard, s);
     s->fe_rx_flush_bh = qemu_bh_new(rt3883_fe_flush_rx_bh, s);
     qemu_format_nic_info_str(qemu_get_queue(s->fe_nic),
                              s->fe_nic_conf.macaddr.a);
