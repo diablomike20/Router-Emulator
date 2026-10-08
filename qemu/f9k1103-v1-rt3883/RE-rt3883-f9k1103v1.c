@@ -25,6 +25,8 @@
 #define RT3883_SOC_SIZE          0x00010000ULL
 #define RT3883_FE_BASE           0x10100000ULL
 #define RT3883_FE_SIZE           0x00010000ULL
+#define RT3883_PCI_BASE          0x10140000ULL
+#define RT3883_PCI_SIZE          0x00020000ULL
 #define RT3883_FLASH_BASE        0x1c000000ULL
 #define RT3883_FLASH_SIZE        (8 * MiB)
 #define RT3883_UBOOT_LOAD_PHYS   0x00200000ULL
@@ -55,6 +57,8 @@
 #define SYSCTL_RSTCTRL_SYS_RST   (1U << 0)
 #define SYSCTL_RSTCTRL_SPI_RST   (1U << 18)
 #define SYSCTL_RSTCTRL_FE_RST    (1U << 21)
+#define SYSCTL_RSTCTRL_PCIE_RST  (1U << 23)
+#define SYSCTL_RSTCTRL_PCI_RST   (1U << 24)
 
 /*
  * Exact F9K1103 v1 boot evidence reports RT3883 at 500 MHz with DDR2.
@@ -78,11 +82,18 @@
 #define SPI_CMD_SE               0xd8
 #define SPI_CMD_RDID             0x9f
 
+#define PCI_REG_PCICFG           0x0000
+#define PCI_REG_CFGADDR          0x0020
+#define PCI_REG_CFGDATA          0x0024
+#define PCI_REG_ARBCTL           0x0080
+#define PCI_REG_STATUS1          0x2050
+
 typedef struct RT3883F9K1103State {
-    MemoryRegion soc_mmio, fe_mmio, flash_mr, ram_mirror;
+    MemoryRegion soc_mmio, fe_mmio, pci_mmio, flash_mr, ram_mirror;
     CharBackend chr;
     uint32_t soc_regs[RT3883_SOC_SIZE / 4];
     uint32_t fe_regs[RT3883_FE_SIZE / 4];
+    uint32_t pci_regs[RT3883_PCI_SIZE / 4];
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -180,10 +191,22 @@ static void rt3883_fe_reset(RT3883F9K1103State *s)
     memset(s->fe_regs, 0, sizeof(s->fe_regs));
 }
 
+static void rt3883_pci_reset(RT3883F9K1103State *s)
+{
+    memset(s->pci_regs, 0, sizeof(s->pci_regs));
+    /*
+     * Keep PCIe link-down until an actual RT309x PCIe device is modelled.
+     * The Linux RT3883 host driver then follows its real no-link path rather
+     * than discovering a fabricated device.
+     */
+    s->pci_regs[PCI_REG_STATUS1 >> 2] = 0;
+}
+
 static void rt3883_device_reset_state(RT3883F9K1103State *s)
 {
     memset(s->soc_regs, 0, sizeof(s->soc_regs));
     rt3883_fe_reset(s);
+    rt3883_pci_reset(s);
     s->uart_rx_r = s->uart_rx_w = 0;
     rt3883_spi_controller_reset(s);
 
@@ -313,6 +336,9 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
         if (v & SYSCTL_RSTCTRL_FE_RST) {
             rt3883_fe_reset(s);
         }
+        if (v & (SYSCTL_RSTCTRL_PCIE_RST | SYSCTL_RSTCTRL_PCI_RST)) {
+            rt3883_pci_reset(s);
+        }
         if (v & SYSCTL_RSTCTRL_SYS_RST) {
             qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
         }
@@ -365,6 +391,39 @@ static void rt3883_fe_write(void *opaque, hwaddr addr, uint64_t val, unsigned si
     if ((addr >> 2) < ARRAY_SIZE(s->fe_regs)) s->fe_regs[addr >> 2] = val;
 }
 
+static uint64_t rt3883_pci_read(void *opaque, hwaddr addr, unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+
+    /*
+     * Config-space reads for an unmodelled downstream device must look like
+     * an empty PCI bus, not zero-filled config space (which would fabricate
+     * vendor/device 0000:0000).
+     */
+    if (addr == PCI_REG_CFGDATA) {
+        return 0xffffffffU;
+    }
+
+    return ((addr >> 2) < ARRAY_SIZE(s->pci_regs)) ?
+           s->pci_regs[addr >> 2] : 0;
+}
+
+static void rt3883_pci_write(void *opaque, hwaddr addr, uint64_t val,
+                             unsigned size)
+{
+    RT3883F9K1103State *s = opaque;
+
+    if ((addr >> 2) < ARRAY_SIZE(s->pci_regs)) {
+        s->pci_regs[addr >> 2] = (uint32_t)val;
+    }
+
+    /*
+     * CFGADDR is retained for observability.  CFGDATA writes are accepted
+     * but no endpoint is materialised until the RT309x PCIe function is
+     * explicitly implemented.
+     */
+}
+
 static const MemoryRegionOps rt3883_soc_ops = {
     .read = rt3883_soc_read, .write = rt3883_soc_write,
     .valid.min_access_size = 1, .valid.max_access_size = 4,
@@ -373,6 +432,12 @@ static const MemoryRegionOps rt3883_soc_ops = {
 };
 static const MemoryRegionOps rt3883_fe_ops = {
     .read = rt3883_fe_read, .write = rt3883_fe_write,
+    .valid.min_access_size = 1, .valid.max_access_size = 4,
+    .impl.min_access_size = 1, .impl.max_access_size = 4,
+    .endianness = DEVICE_LITTLE_ENDIAN,
+};
+static const MemoryRegionOps rt3883_pci_ops = {
+    .read = rt3883_pci_read, .write = rt3883_pci_write,
     .valid.min_access_size = 1, .valid.max_access_size = 4,
     .impl.min_access_size = 1, .impl.max_access_size = 4,
     .endianness = DEVICE_LITTLE_ENDIAN,
@@ -444,6 +509,11 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_init_io(&s->fe_mmio, OBJECT(machine), &rt3883_fe_ops, s,
                           "rt3883.frame-engine", RT3883_FE_SIZE);
     memory_region_add_subregion(sysmem, RT3883_FE_BASE, &s->fe_mmio);
+
+    error_report("RT3883_M1_STAGE=pci_mmio");
+    memory_region_init_io(&s->pci_mmio, OBJECT(machine), &rt3883_pci_ops, s,
+                          "rt3883.pci-host", RT3883_PCI_SIZE);
+    memory_region_add_subregion(sysmem, RT3883_PCI_BASE, &s->pci_mmio);
 
     error_report("RT3883_M1_STAGE=flash_map");
     memory_region_init_ram_nomigrate(&s->flash_mr, OBJECT(machine), "rt3883.spi-nor",
