@@ -18,7 +18,7 @@
 #include "hw/irq.h"
 #include "hw/mips/mips.h"
 #include "hw/qdev-properties.h"
-#include "hw/sysbus.h"
+#include "hw/sysbus.h"\n#include "net/net.h"
 #include "hw/usb/hcd-ehci.h"
 #include "hw/usb/hcd-ohci.h"
 #include "qemu/module.h"
@@ -140,9 +140,16 @@
 #define FE_RX_DMA_EN             (1U << 2)
 #define FE_TX_WB_DDONE           (1U << 6)
 #define FE_TX_DONE_INT0          (1U << 8)
+#define FE_RX_DONE_INT0          (1U << 2)
 #define FE_TX_DONE_INT_MASK      (0xFU << 8)
 #define FE_TX_DESC_SIZE          16U
+#define FE_RX_DESC_SIZE          16U
 #define FE_TX_DMA_DONE           (1U << 31)
+#define FE_RX_DMA_DONE           (1U << 31)
+#define FE_TX_DMA_BUF_LEN        0x3fffU
+#define FE_TX_DMA_LS1            (1U << 14)
+#define FE_TX_DMA_LS0            (1U << 30)
+#define FE_RX_DMA_BUF_LEN        0x3fffU
 
 /*
  * RT3883 integrated WiSoC MAC.  OpenWrt RT3883 DTS maps a 0x40000-byte
@@ -218,6 +225,11 @@ typedef struct RT3883F9K1103State {
     uint8_t wmac_bbp[256];
     uint8_t wmac_rf[64];
     qemu_irq fe_irq;
+    NICState *fe_nic;
+    NICConf fe_nic_conf;
+    uint32_t fe_rx_next;
+    uint8_t fe_tx_frame[NET_BUFSIZE];
+    size_t fe_tx_frame_len;
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -332,8 +344,203 @@ static void rt3883_fe_update_irq(RT3883F9K1103State *s)
 static void rt3883_fe_reset(RT3883F9K1103State *s)
 {
     memset(s->fe_regs, 0, sizeof(s->fe_regs));
+    s->fe_rx_next = 0;
+    s->fe_tx_frame_len = 0;
     rt3883_fe_update_irq(s);
 }
+
+static bool rt3883_fe_mem_read(hwaddr addr, void *buf, size_t len)
+{
+    return address_space_read(&address_space_memory, addr,
+                              MEMTXATTRS_UNSPECIFIED,
+                              buf, len) == MEMTX_OK;
+}
+
+static bool rt3883_fe_mem_write(hwaddr addr, const void *buf, size_t len)
+{
+    return address_space_write(&address_space_memory, addr,
+                               MEMTXATTRS_UNSPECIFIED,
+                               buf, len) == MEMTX_OK;
+}
+
+/*
+ * The physical F9K1103 CPU port is tagged:
+ *   VLAN 1 = LAN ports 0..3 + CPU port 5t
+ *   VLAN 2 = WAN port 4 + CPU port 5t
+ *
+ * The first host backend intentionally represents one untagged LAN port.
+ * Strip VLAN 1 on guest egress; keep untagged frames for the U-Boot path;
+ * do not leak VLAN 2/WAN frames into the LAN backend.
+ */
+static size_t rt3883_fe_lan_egress(const uint8_t *in, size_t len,
+                                   uint8_t *out, size_t out_size)
+{
+    uint16_t ethertype, tci;
+
+    if (len > out_size || len < 14) {
+        return 0;
+    }
+
+    ethertype = ((uint16_t)in[12] << 8) | in[13];
+    if (ethertype != 0x8100 || len < 18) {
+        memcpy(out, in, len);
+        return len;
+    }
+
+    tci = ((uint16_t)in[14] << 8) | in[15];
+    if ((tci & 0x0fff) != 1) {
+        return 0;
+    }
+
+    if (len - 4 > out_size) {
+        return 0;
+    }
+
+    memcpy(out, in, 12);
+    memcpy(out + 12, in + 16, len - 16);
+    return len - 4;
+}
+
+static size_t rt3883_fe_lan_ingress(const uint8_t *in, size_t len,
+                                    uint8_t *out, size_t out_size)
+{
+    if (len < 14 || len + 4 > out_size) {
+        return 0;
+    }
+
+    memcpy(out, in, 12);
+    out[12] = 0x81;
+    out[13] = 0x00;
+    out[14] = 0x00;
+    out[15] = 0x01;
+    memcpy(out + 16, in + 12, len - 12);
+    return len + 4;
+}
+
+static void rt3883_fe_tx_append(RT3883F9K1103State *s,
+                                hwaddr addr, unsigned len)
+{
+    if (!len || s->fe_tx_frame_len + len > sizeof(s->fe_tx_frame)) {
+        return;
+    }
+
+    if (rt3883_fe_mem_read(addr, s->fe_tx_frame + s->fe_tx_frame_len, len)) {
+        s->fe_tx_frame_len += len;
+    }
+}
+
+static void rt3883_fe_tx_emit(RT3883F9K1103State *s)
+{
+    uint8_t frame[NET_BUFSIZE];
+    size_t len;
+
+    if (!s->fe_tx_frame_len) {
+        return;
+    }
+
+    len = rt3883_fe_lan_egress(s->fe_tx_frame, s->fe_tx_frame_len,
+                               frame, sizeof(frame));
+    if (len && s->fe_nic) {
+        qemu_send_packet(qemu_get_queue(s->fe_nic), frame, len);
+    }
+
+    s->fe_tx_frame_len = 0;
+}
+
+static bool rt3883_fe_rx_desc_available(RT3883F9K1103State *s)
+{
+    uint32_t glo = s->fe_regs[FE_PDMA_GLO_CFG >> 2];
+    uint32_t base = s->fe_regs[FE_RX_BASE_PTR0 >> 2];
+    uint32_t count = s->fe_regs[FE_RX_MAX_CNT0 >> 2];
+    uint8_t desc[FE_RX_DESC_SIZE];
+    uint32_t rxd2;
+    uint32_t idx;
+
+    if (!(glo & FE_RX_DMA_EN) || !base || !count || count > 4096) {
+        return false;
+    }
+
+    idx = s->fe_rx_next % count;
+    if (!rt3883_fe_mem_read((hwaddr)base + (hwaddr)idx * FE_RX_DESC_SIZE,
+                            desc, sizeof(desc))) {
+        return false;
+    }
+
+    rxd2 = ldl_le_p(desc + 4);
+    return !(rxd2 & FE_RX_DMA_DONE);
+}
+
+static bool rt3883_fe_rx_inject(RT3883F9K1103State *s,
+                                const uint8_t *buf, size_t size)
+{
+    uint32_t base = s->fe_regs[FE_RX_BASE_PTR0 >> 2];
+    uint32_t count = s->fe_regs[FE_RX_MAX_CNT0 >> 2];
+    uint8_t desc[FE_RX_DESC_SIZE];
+    uint8_t frame[NET_BUFSIZE];
+    uint32_t idx, rxd1, rxd2;
+    size_t frame_len;
+    hwaddr desc_addr;
+
+    if (!rt3883_fe_rx_desc_available(s)) {
+        return false;
+    }
+
+    frame_len = rt3883_fe_lan_ingress(buf, size, frame, sizeof(frame));
+    if (!frame_len || frame_len > FE_RX_DMA_BUF_LEN) {
+        return false;
+    }
+
+    idx = s->fe_rx_next % count;
+    desc_addr = (hwaddr)base + (hwaddr)idx * FE_RX_DESC_SIZE;
+    if (!rt3883_fe_mem_read(desc_addr, desc, sizeof(desc))) {
+        return false;
+    }
+
+    rxd1 = ldl_le_p(desc);
+    if (!rxd1 || !rt3883_fe_mem_write(rxd1, frame, frame_len)) {
+        return false;
+    }
+
+    rxd2 = FE_RX_DMA_DONE |
+           (((uint32_t)frame_len & FE_RX_DMA_BUF_LEN) << 16);
+    stl_le_p(desc + 4, rxd2);
+    stl_le_p(desc + 8, 0);
+    stl_le_p(desc + 12, 0);
+    if (!rt3883_fe_mem_write(desc_addr, desc, sizeof(desc))) {
+        return false;
+    }
+
+    s->fe_regs[FE_RX_DRX_IDX0 >> 2] = idx;
+    s->fe_rx_next = (idx + 1) % count;
+    s->fe_regs[FE_INT_STATUS >> 2] |= FE_RX_DONE_INT0;
+    rt3883_fe_update_irq(s);
+    return true;
+}
+
+static bool rt3883_fe_can_receive(NetClientState *nc)
+{
+    RT3883F9K1103State *s = qemu_get_nic_opaque(nc);
+
+    return rt3883_fe_rx_desc_available(s);
+}
+
+static ssize_t rt3883_fe_receive(NetClientState *nc,
+                                 const uint8_t *buf, size_t size)
+{
+    RT3883F9K1103State *s = qemu_get_nic_opaque(nc);
+
+    if (!rt3883_fe_rx_inject(s, buf, size)) {
+        return 0;
+    }
+    return size;
+}
+
+static NetClientInfo net_rt3883_fe_info = {
+    .type = NET_CLIENT_DRIVER_NIC,
+    .size = sizeof(NICState),
+    .can_receive = rt3883_fe_can_receive,
+    .receive = rt3883_fe_receive,
+};
 
 static bool rt3883_fe_tx_desc_complete(hwaddr addr)
 {
@@ -379,6 +586,36 @@ static void rt3883_fe_tx_kick(RT3883F9K1103State *s)
      */
     while (dtx != ctx && done < count) {
         hwaddr desc_addr = (hwaddr)base + (hwaddr)dtx * FE_TX_DESC_SIZE;
+        uint8_t desc[FE_TX_DESC_SIZE];
+        uint32_t txd1, txd2, txd3;
+        unsigned plen0, plen1;
+        bool ls0, ls1;
+
+        if (!rt3883_fe_mem_read(desc_addr, desc, sizeof(desc))) {
+            break;
+        }
+
+        txd1 = ldl_le_p(desc);
+        txd2 = ldl_le_p(desc + 4);
+        txd3 = ldl_le_p(desc + 8);
+        plen0 = (txd2 >> 16) & FE_TX_DMA_BUF_LEN;
+        plen1 = txd2 & FE_TX_DMA_BUF_LEN;
+        ls0 = !!(txd2 & FE_TX_DMA_LS0);
+        ls1 = !!(txd2 & FE_TX_DMA_LS1);
+
+        if (plen0) {
+            rt3883_fe_tx_append(s, txd1, plen0);
+        }
+        if (ls0) {
+            rt3883_fe_tx_emit(s);
+        }
+
+        if (plen1) {
+            rt3883_fe_tx_append(s, txd3, plen1);
+        }
+        if (ls1) {
+            rt3883_fe_tx_emit(s);
+        }
 
         if (!rt3883_fe_tx_desc_complete(desc_addr)) {
             break;
@@ -1072,6 +1309,20 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     memory_region_init_io(&s->fe_mmio, OBJECT(machine), &rt3883_fe_ops, s,
                           "rt3883.frame-engine", RT3883_FE_SIZE);
     memory_region_add_subregion(sysmem, RT3883_FE_BASE, &s->fe_mmio);
+
+    /*
+     * Optional host LAN backend.  The research machine attaches to a modern
+     * -netdev with id=net0 when present.  With no net0, the FE remains a valid
+     * disconnected hardware model and all boot gates continue to work.
+     */
+    error_report("RT3883_M1_STAGE=fe_net");
+    memset(&s->fe_nic_conf, 0, sizeof(s->fe_nic_conf));
+    s->fe_nic_conf.peers.queues = 1;
+    s->fe_nic_conf.peers.ncs[0] = qemu_find_netdev("net0");
+    s->fe_nic = qemu_new_nic(&net_rt3883_fe_info, &s->fe_nic_conf,
+                             "rt3883-fe", "rt3883-fe", NULL, s);
+    qemu_format_nic_info_str(qemu_get_queue(s->fe_nic),
+                             s->fe_nic_conf.macaddr.a);
 
     error_report("RT3883_M1_STAGE=pci_mmio");
     memory_region_init_io(&s->pci_mmio, OBJECT(machine), &rt3883_pci_ops, s,
