@@ -414,6 +414,17 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     rt3883_fe_reset(s);
     memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
     memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
+
+    /*
+     * Exact Linux rtl8367b detection contract for the physical F9K1103:
+     * CHIP_NUMBER (0x1300) may remain 0x0000 (the generic rtl8367 driver
+     * rejects it exactly that way), while CHIP_VER 0x1010 identifies
+     * RTL8367R-VB.  This also makes original U-Boot select its VB-specific
+     * high-revision init table instead of the zero-revision fallback.
+     */
+    s->rtl8367_regs[0x1300] = 0x0000;
+    s->rtl8367_regs[0x1301] = 0x1010;
+
     rt3883_smi_end(s);
     s->smi_prev_sck = true;
     s->smi_prev_sda = true;
