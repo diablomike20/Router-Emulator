@@ -7,7 +7,7 @@ concurrency:
 on:
   workflow_dispatch:
   push:
-    branches: [f9k1103-v1-rt3883-uboot-emulator-m1]
+    branches: [f9k1103-v1-rt3883-uboot-emulator-m1, f9k1103-v1-rt3883-uboot-emulator-m1-pci-wip]
     paths:
       - 'qemu/f9k1103-v1-rt3883/**'
       - 'scripts/RE-build-qemu-f9k1103-v1-rt3883.sh'
