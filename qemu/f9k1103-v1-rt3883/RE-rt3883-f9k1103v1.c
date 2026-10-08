@@ -9,6 +9,7 @@
 #include "qemu/osdep.h"
 #include "qapi/error.h"
 #include "qemu/error-report.h"
+#include "qemu/main-loop.h"
 #include "chardev/char-fe.h"
 #include "exec/address-spaces.h"
 #include "hw/boards.h"
@@ -230,6 +231,7 @@ typedef struct RT3883F9K1103State {
     qemu_irq fe_irq;
     NICState *fe_nic;
     NICConf fe_nic_conf;
+    QEMUBH *fe_rx_flush_bh;
     uint32_t fe_rx_next;
     uint8_t fe_tx_frame[NET_BUFSIZE];
     size_t fe_tx_frame_len;
@@ -348,6 +350,9 @@ static void rt3883_fe_update_irq(RT3883F9K1103State *s)
 
 static void rt3883_fe_reset(RT3883F9K1103State *s)
 {
+    if (s->fe_rx_flush_bh) {
+        qemu_bh_cancel(s->fe_rx_flush_bh);
+    }
     memset(s->fe_regs, 0, sizeof(s->fe_regs));
     s->fe_rx_next = 0;
     s->fe_tx_frame_len = 0;
@@ -1136,16 +1141,25 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
     }
 }
 
-static void rt3883_fe_flush_rx_if_ready(RT3883F9K1103State *s)
+static void rt3883_fe_flush_rx_bh(void *opaque)
 {
+    RT3883F9K1103State *s = opaque;
+
     if (s->fe_nic && rt3883_fe_rx_desc_available(s)) {
         /*
-         * QEMU queues an inbound packet when .can_receive() is false.
-         * Once the guest re-enables RX DMA or returns an RX descriptor to
-         * hardware, explicitly retry that queue.  This is the standard QEMU
-         * NIC lifecycle contract used by other descriptor-ring devices.
+         * Defer delivery until after the guest's FE MMIO write completes.
+         * Flushing synchronously from FE_PDMA_GLO_CFG / FE_RX_CALC_IDX0 made
+         * Slirp re-enter the NIC receive path while the descriptor-ring MMIO
+         * transaction was still active, which is not a safe lifecycle edge.
          */
         qemu_flush_queued_packets(qemu_get_queue(s->fe_nic));
+    }
+}
+
+static void rt3883_fe_flush_rx_if_ready(RT3883F9K1103State *s)
+{
+    if (s->fe_rx_flush_bh && rt3883_fe_rx_desc_available(s)) {
+        qemu_bh_schedule(s->fe_rx_flush_bh);
     }
 }
 
@@ -1397,6 +1411,7 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     s->fe_nic_conf.peers.ncs[0] = qemu_find_netdev("net0");
     s->fe_nic = qemu_new_nic(&net_rt3883_fe_info, &s->fe_nic_conf,
                              "rt3883-fe", "rt3883-fe", NULL, s);
+    s->fe_rx_flush_bh = qemu_bh_new(rt3883_fe_flush_rx_bh, s);
     qemu_format_nic_info_str(qemu_get_queue(s->fe_nic),
                              s->fe_nic_conf.macaddr.a);
 
