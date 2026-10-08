@@ -282,16 +282,25 @@ _start:
     nop
 
     /*
-     * RT3883 integrated WMAC lives at physical 0x10180000.  M1 does not
-     * invent an RF device yet; prove the MMIO aperture and WLAN reset path.
+     * Physical F9K1103 baseline: integrated WMAC reports RT3883 rev 0400.
+     * MAC_CSR0 is therefore exactly 0x38830400.  Also prove that WLAN
+     * peripheral reset restores identity and clears ordinary register state.
      */
     lui $s7,0xb018
     lw $t1,0x1000($s7)
-    bnez $t1,wmac_fail
+    li $t2,0x38830400
+    bne $t1,$t2,wmac_fail
     nop
-    li $t0,0x574d4143
-    sw $t0,0x1000($s7)
+
+    /* Identity register must ignore guest writes. */
+    sw $zero,0x1000($s7)
     lw $t1,0x1000($s7)
+    bne $t1,$t2,wmac_fail
+    nop
+
+    li $t0,0x574d4143
+    sw $t0,0x1004($s7)
+    lw $t1,0x1004($s7)
     bne $t0,$t1,wmac_fail
     nop
 
@@ -299,6 +308,10 @@ _start:
     sw $t0,0($s1)
     sw $zero,0($s1)
     lw $t1,0x1000($s7)
+    li $t2,0x38830400
+    bne $t1,$t2,wmac_fail
+    nop
+    lw $t1,0x1004($s7)
     bnez $t1,wmac_fail
     nop
 
@@ -422,7 +435,7 @@ msg_pci_host: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_usbhost: .asciz "RT3883_F9K1103V1_USBHOST_EHCI_NODVC_GATE=PASS\n"
 msg_ohci: .asciz "RT3883_F9K1103V1_USBHOST_OHCI_NODVC_GATE=PASS\n"
-msg_wmac: .asciz "RT3883_F9K1103V1_WMAC_MMIO_NODVC_GATE=PASS\n"
+msg_wmac: .asciz "RT3883_F9K1103V1_WMAC_RT3883_ID_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
 msg_system_reset: .asciz "RT3883_F9K1103V1_SYSTEM_RESET_GATE=PASS\n"
@@ -432,7 +445,7 @@ msg_gpio_fail: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=FAIL\n"
 msg_gpio_bank_fail: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=FAIL\n"
 msg_usbhost_fail: .asciz "RT3883_F9K1103V1_USBHOST_EHCI_NODVC_GATE=FAIL\n"
 msg_ohci_fail: .asciz "RT3883_F9K1103V1_USBHOST_OHCI_NODVC_GATE=FAIL\n"
-msg_wmac_fail: .asciz "RT3883_F9K1103V1_WMAC_MMIO_NODVC_GATE=FAIL\n"
+msg_wmac_fail: .asciz "RT3883_F9K1103V1_WMAC_RT3883_ID_GATE=FAIL\n"
 msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
 msg_ram_mirror_fail: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=FAIL\n"
 msg_pci_host_fail: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=FAIL\n"
