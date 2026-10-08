@@ -70,6 +70,11 @@
 #define RTL8367_REG_IND_ADDR     0x1f02
 #define RTL8367_REG_IND_WRDATA   0x1f03
 #define RTL8367_REG_IND_RDDATA   0x1f04
+#define RTL8367_REG_CHIP_NUMBER  0x1300
+#define RTL8367_REG_CHIP_VERSION 0x1301
+#define RTL8367_REG_CHIP_MODE    0x1302
+#define RTL8367_REG_CHIP_RESET   0x1322
+#define RTL8367_CHIPVER_R_VB     0x1010
 #define RTL8367_IND_CMD          0x0001
 #define RTL8367_IND_WRITE        0x0002
 #define RTL8367_PHY_BASE         0x2000
@@ -299,6 +304,18 @@ static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
 static void rt3883_rtl8367_reg_write(RT3883F9K1103State *s,
                                       uint16_t reg, uint16_t value)
 {
+    if (reg == RTL8367_REG_CHIP_RESET && (value & 1)) {
+        /*
+         * RTL8367R-VB CHIP_RESET is a self-clearing command bit.  Linux
+         * writes 1 and polls until hardware returns 0.  This behavior was
+         * exact-runtime verified on the earlier M1 WMAC-shell branch.
+         */
+        memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
+        memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
+        s->rtl8367_regs[RTL8367_REG_CHIP_VERSION] = RTL8367_CHIPVER_R_VB;
+        return;
+    }
+
     s->rtl8367_regs[reg] = value;
 
     if (reg == RTL8367_REG_IND_CTRL && (value & RTL8367_IND_CMD)) {
@@ -490,6 +507,11 @@ static void rt3883_device_reset_state(RT3883F9K1103State *s)
     rt3883_wmac_reset(s);
     memset(s->rtl8367_regs, 0, sizeof(s->rtl8367_regs));
     memset(s->rtl8367_phy, 0, sizeof(s->rtl8367_phy));
+    /*
+     * F9K1103 v1 external switch identity.  Linux rtl8367b detects
+     * RTL8367R-VB from CHIP_VERSION 0x1010; keep number/mode reset-default.
+     */
+    s->rtl8367_regs[RTL8367_REG_CHIP_VERSION] = RTL8367_CHIPVER_R_VB;
     rt3883_smi_end(s);
     s->smi_prev_sck = true;
     s->smi_prev_sda = true;
