@@ -8,6 +8,21 @@ mkdir -p "$WORK"
 if [ ! -d "$QEMU_SRC/.git" ]; then
   git clone --depth 1 --branch "$QEMU_TAG" https://github.com/qemu/qemu.git "$QEMU_SRC"
 fi
+
+# The stock mipsel-softmmu configuration contains PCI EHCI but not the
+# sysbus/platform EHCI used by the RT3883 SoC.  Enable QEMU's upstream
+# sysbus EHCI core explicitly; OHCI is kept explicit as well for provenance.
+python3 - "$QEMU_SRC/configs/devices/mipsel-softmmu/default.mak" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+for line in ("CONFIG_USB_EHCI_SYSBUS=y", "CONFIG_USB_OHCI=y"):
+    if line not in s:
+        s += "\n" + line
+p.write_text(s)
+PY
+
 cp "$ROOT/qemu/f9k1103-v1-rt3883/RE-rt3883-f9k1103v1.c" "$QEMU_SRC/hw/mips/rt3883_f9k1103v1.c"
 python3 - "$QEMU_SRC/hw/mips/meson.build" <<'PY'
 from pathlib import Path
