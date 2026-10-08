@@ -89,6 +89,16 @@ _start:
     jal uart_puts
     nop
 
+    /* Physical F9K1103 dmesg: RT3883 ver:1 eco:5 => REVID 0x00000105. */
+    lui $t0,0xb000
+    lw $t1,0x000c($t0)
+    li $t2,0x00000105
+    bne $t1,$t2,revid_fail
+    nop
+    la $a0,msg_revid
+    jal uart_puts
+    nop
+
     /*
      * Linux/MIPS detect_memory_region() probes powers of two above a magic
      * word.  On the physical 64 MiB RT3883 board, address bit 26 wraps and
@@ -126,6 +136,31 @@ _start:
     bne $t1,$t2,pci_host_fail
     nop
     la $a0,msg_pci_host
+    jal uart_puts
+    nop
+
+    /*
+     * RT3883 USB host: EHCI @ 0x101c0000, OHCI @ 0x101c1000.
+     * EHCI uses 0x20 capability length and exactly two physical ports.
+     * OHCI revision register reports 1.0 (0x10).
+     */
+    lui $s6,0xb01c
+    lw $t1,0x0000($s6)
+    andi $t2,$t1,0x00ff
+    li $t3,0x20
+    bne $t2,$t3,usb_host_fail
+    nop
+    lw $t1,0x0004($s6)
+    andi $t2,$t1,0x000f
+    li $t3,0x2
+    bne $t2,$t3,usb_host_fail
+    nop
+    lw $t1,0x1000($s6)
+    andi $t2,$t1,0x00ff
+    li $t3,0x10
+    bne $t2,$t3,usb_host_fail
+    nop
+    la $a0,msg_usb_host
     jal uart_puts
     nop
 
@@ -241,6 +276,18 @@ gpio_bank_fail:
     nop
     b hang
     nop
+usb_host_fail:
+    la $a0,msg_usb_host_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
+revid_fail:
+    la $a0,msg_revid_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 pci_host_fail:
     la $a0,msg_pci_host_fail
     jal uart_puts
@@ -292,8 +339,10 @@ msg_flash: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=PASS\n"
 msg_gpio: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=PASS\n"
 msg_gpio_bank: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=PASS\n"
 msg_syscfg: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=PASS\n"
+msg_revid: .asciz "RT3883_F9K1103V1_REVID_1_5_GATE=PASS\n"
 msg_ram_mirror: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=PASS\n"
 msg_pci_host: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=PASS\n"
+msg_usb_host: .asciz "RT3883_F9K1103V1_USB_HOST_2PORT_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
@@ -303,7 +352,9 @@ msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
 msg_gpio_fail: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=FAIL\n"
 msg_gpio_bank_fail: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=FAIL\n"
 msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
+msg_revid_fail: .asciz "RT3883_F9K1103V1_REVID_1_5_GATE=FAIL\n"
 msg_ram_mirror_fail: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=FAIL\n"
 msg_pci_host_fail: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=FAIL\n"
+msg_usb_host_fail: .asciz "RT3883_F9K1103V1_USB_HOST_2PORT_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
 msg_spi_rdsr_fail: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=FAIL\n"
