@@ -1136,6 +1136,19 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
     }
 }
 
+static void rt3883_fe_flush_rx_if_ready(RT3883F9K1103State *s)
+{
+    if (s->fe_nic && rt3883_fe_rx_desc_available(s)) {
+        /*
+         * QEMU queues an inbound packet when .can_receive() is false.
+         * Once the guest re-enables RX DMA or returns an RX descriptor to
+         * hardware, explicitly retry that queue.  This is the standard QEMU
+         * NIC lifecycle contract used by other descriptor-ring devices.
+         */
+        qemu_flush_queued_packets(qemu_get_queue(s->fe_nic));
+    }
+}
+
 static uint64_t rt3883_fe_read(void *opaque, hwaddr addr, unsigned size)
 {
     RT3883F9K1103State *s = opaque;
@@ -1179,6 +1192,10 @@ static void rt3883_fe_write(void *opaque, hwaddr addr, uint64_t val, unsigned si
 
     if (addr == FE_TX_CTX_IDX0 || addr == FE_PDMA_GLO_CFG) {
         rt3883_fe_tx_kick(s);
+    }
+
+    if (addr == FE_PDMA_GLO_CFG || addr == FE_RX_CALC_IDX0) {
+        rt3883_fe_flush_rx_if_ready(s);
     }
 }
 
