@@ -46,9 +46,23 @@
 #define PIO_DIR24_OFF            0x064c
 #define PIO_SET24_OFF            0x0654
 #define PIO_RESET24_OFF          0x0658
+#define F9K1103_SMI_SDA_GPIO     1
+#define F9K1103_SMI_SCK_GPIO     2
 #define F9K1103_SWITCH_RST_GPIO  24
 #define F9K1103_RESET_GPIO       25
 #define F9K1103_WPS_GPIO         26
+
+#define RTL8367_SMI_SLAVE_ADDR   0xb8
+#define RTL8367_REG_COUNT        0x10000
+#define RTL8367_REG_IND_CTRL     0x1f00
+#define RTL8367_REG_IND_STATUS   0x1f01
+#define RTL8367_REG_IND_ADDR     0x1f02
+#define RTL8367_REG_IND_WRDATA   0x1f03
+#define RTL8367_REG_IND_RDDATA   0x1f04
+#define RTL8367_IND_CMD          0x0001
+#define RTL8367_IND_WRITE        0x0002
+#define RTL8367_PHY_BASE         0x2000
+#define RTL8367_PHY_OFFSET       5
 
 #define SYSCTL_SYSCFG0_OFF       0x0010
 #define SYSCTL_RSTCTRL_OFF       0x0034
@@ -78,6 +92,15 @@
 #define SPI_CMD_SE               0xd8
 #define SPI_CMD_RDID             0x9f
 
+typedef enum RT3883SMIStage {
+    SMI_STAGE_IDLE = 0,
+    SMI_STAGE_HOST_BITS,
+    SMI_STAGE_DEVICE_ACK,
+    SMI_STAGE_DEVICE_READ,
+    SMI_STAGE_HOST_READ_ACK,
+    SMI_STAGE_WAIT_STOP,
+} RT3883SMIStage;
+
 typedef struct RT3883F9K1103State {
     MemoryRegion soc_mmio, fe_mmio, flash_mr, ram_mirror;
     CharBackend chr;
@@ -90,6 +113,15 @@ typedef struct RT3883F9K1103State {
     unsigned spi_phase, spi_addr_bytes, rdid_index;
     uint32_t spi_addr;
     bool spi_cs_low, spi_wel;
+
+    uint16_t rtl8367_regs[RTL8367_REG_COUNT];
+    uint16_t rtl8367_phy[8][32];
+    RT3883SMIStage smi_stage;
+    uint8_t smi_cmd, smi_shift, smi_host_bytes, smi_data_lo;
+    uint16_t smi_addr, smi_read_value;
+    unsigned smi_bits, smi_read_bit, smi_read_byte;
+    bool smi_active, smi_prev_sck, smi_prev_sda, smi_prev_valid;
+    bool smi_read_line;
 } RT3883F9K1103State;
 
 typedef struct RT3883ResetData {
