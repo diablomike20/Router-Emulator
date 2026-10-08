@@ -257,6 +257,31 @@ _start:
     nop
 
     /*
+     * RT3883 OHCI companion starts at 0x101c1000.  Prove standard OHCI 1.0
+     * revision, two root-hub ports and self-clearing HostControllerReset.
+     */
+    lui $s5,0xb01c
+    ori $s5,$s5,0x1000
+    lw $t1,0x0000($s5)
+    li $t2,0x0010
+    bne $t1,$t2,ohci_fail
+    nop
+    lw $t1,0x0048($s5)
+    andi $t1,$t1,0x00ff
+    li $t2,0x0002
+    bne $t1,$t2,ohci_fail
+    nop
+    li $t0,0x0001
+    sw $t0,0x0008($s5)
+    lw $t1,0x0008($s5)
+    andi $t1,$t1,0x0001
+    bnez $t1,ohci_fail
+    nop
+    la $a0,msg_ohci
+    jal uart_puts
+    nop
+
+    /*
      * RT3883 integrated WMAC lives at physical 0x10180000.  M1 does not
      * invent an RF device yet; prove the MMIO aperture and WLAN reset path.
      */
@@ -335,6 +360,12 @@ ram_mirror_fail:
     nop
     b hang
     nop
+ohci_fail:
+    la $a0,msg_ohci_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 wmac_fail:
     la $a0,msg_wmac_fail
     jal uart_puts
@@ -390,6 +421,7 @@ msg_ram_mirror: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=PASS\n"
 msg_pci_host: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_usbhost: .asciz "RT3883_F9K1103V1_USBHOST_EHCI_NODVC_GATE=PASS\n"
+msg_ohci: .asciz "RT3883_F9K1103V1_USBHOST_OHCI_NODVC_GATE=PASS\n"
 msg_wmac: .asciz "RT3883_F9K1103V1_WMAC_MMIO_NODVC_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
@@ -399,6 +431,7 @@ msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
 msg_gpio_fail: .asciz "RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=FAIL\n"
 msg_gpio_bank_fail: .asciz "RT3883_F9K1103V1_GPIO24_39_BANK_GATE=FAIL\n"
 msg_usbhost_fail: .asciz "RT3883_F9K1103V1_USBHOST_EHCI_NODVC_GATE=FAIL\n"
+msg_ohci_fail: .asciz "RT3883_F9K1103V1_USBHOST_OHCI_NODVC_GATE=FAIL\n"
 msg_wmac_fail: .asciz "RT3883_F9K1103V1_WMAC_MMIO_NODVC_GATE=FAIL\n"
 msg_syscfg_fail: .asciz "RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=FAIL\n"
 msg_ram_mirror_fail: .asciz "RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=FAIL\n"
