@@ -109,6 +109,31 @@
 #define PCI_REG_ARBCTL           0x0080
 #define PCI_REG_STATUS1          0x2050
 
+/*
+ * RT3883 integrates an EHCI 1.0 host controller at 0x101c0000.
+ * M1 models only the controller/core semantics required by Linux; there are
+ * no fabricated downstream USB devices.
+ */
+#define EHCI_CAPLENGTH            0x20
+#define EHCI_HCIVERSION           0x0100
+#define EHCI_CAPBASE_OFF          0x0000
+#define EHCI_HCSPARAMS_OFF        0x0004
+#define EHCI_HCCPARAMS_OFF        0x0008
+#define EHCI_USBCMD_OFF           0x0020
+#define EHCI_USBSTS_OFF           0x0024
+#define EHCI_USBINTR_OFF          0x0028
+#define EHCI_FRINDEX_OFF          0x002c
+#define EHCI_CTRLDSSEGMENT_OFF    0x0030
+#define EHCI_PERIODICLIST_OFF     0x0034
+#define EHCI_ASYNCLIST_OFF        0x0038
+#define EHCI_CONFIGFLAG_OFF       0x0060
+#define EHCI_PORTSC0_OFF          0x0064
+#define EHCI_PORTSC1_OFF          0x0068
+#define EHCI_CMD_RUN              (1U << 0)
+#define EHCI_CMD_RESET            (1U << 1)
+#define EHCI_STS_HALT             (1U << 12)
+#define EHCI_PORT_POWER           (1U << 12)
+
 typedef enum RT3883SMIStage {
     SMI_STAGE_IDLE = 0,
     SMI_STAGE_HOST_BITS,
@@ -244,14 +269,24 @@ static void rt3883_pci_reset(RT3883F9K1103State *s)
 
 static void rt3883_usbhost_reset(RT3883F9K1103State *s)
 {
-    /*
-     * M1 initially exposes the documented RT3883 USB-host window as an
-     * inert, zero-reset register block.  This is deliberately a no-device
-     * shell, not a claim of EHCI behavioural fidelity.  It prevents an
-     * unmapped KSEG1 access from killing Linux and lets the guest reveal
-     * which EHCI semantics are actually required next.
-     */
     memset(s->usbhost_regs, 0, sizeof(s->usbhost_regs));
+
+    /*
+     * Minimal EHCI 1.0 identity for the integrated RT3883 host:
+     *   CAPLENGTH  = 0x20
+     *   HCIVERSION = 1.0
+     *   N_PORTS    = 2 (the F9K1103 exposes two USB connectors)
+     * Reset leaves the schedule stopped and HCHalted asserted.
+     *
+     * This is intentionally a no-device controller.  It is sufficient for
+     * Linux to initialise/register the root hub without inventing USB
+     * peripherals which have not been modelled.
+     */
+    s->usbhost_regs[EHCI_CAPBASE_OFF >> 2] =
+        ((uint32_t)EHCI_HCIVERSION << 16) | EHCI_CAPLENGTH;
+    s->usbhost_regs[EHCI_HCSPARAMS_OFF >> 2] = 2;
+    s->usbhost_regs[EHCI_HCCPARAMS_OFF >> 2] = 0;
+    s->usbhost_regs[EHCI_USBSTS_OFF >> 2] = EHCI_STS_HALT;
 }
 
 static uint16_t rt3883_rtl8367_reg_read(RT3883F9K1103State *s,
@@ -743,8 +778,58 @@ static void rt3883_usbhost_write(void *opaque, hwaddr addr, uint64_t val,
                                  unsigned size)
 {
     RT3883F9K1103State *s = opaque;
-    if ((addr >> 2) < ARRAY_SIZE(s->usbhost_regs)) {
-        s->usbhost_regs[addr >> 2] = (uint32_t)val;
+    uint32_t v = (uint32_t)val;
+
+    if ((addr >> 2) >= ARRAY_SIZE(s->usbhost_regs)) {
+        return;
+    }
+
+    switch (addr) {
+    case EHCI_CAPBASE_OFF:
+    case EHCI_HCSPARAMS_OFF:
+    case EHCI_HCCPARAMS_OFF:
+        /* Capability registers are read-only. */
+        return;
+
+    case EHCI_USBCMD_OFF:
+        if (v & EHCI_CMD_RESET) {
+            /*
+             * EHCI HCRESET is self-clearing.  Complete immediately because
+             * M1 has no asynchronous USB device state to quiesce.
+             */
+            rt3883_usbhost_reset(s);
+            return;
+        }
+
+        s->usbhost_regs[EHCI_USBCMD_OFF >> 2] = v & ~EHCI_CMD_RESET;
+        if (v & EHCI_CMD_RUN) {
+            s->usbhost_regs[EHCI_USBSTS_OFF >> 2] &= ~EHCI_STS_HALT;
+        } else {
+            s->usbhost_regs[EHCI_USBSTS_OFF >> 2] |= EHCI_STS_HALT;
+        }
+        return;
+
+    case EHCI_USBSTS_OFF:
+        /*
+         * Interrupt/status causes are write-one-to-clear.  HCHalted is
+         * controller state and follows USBCMD.RUN instead.
+         */
+        s->usbhost_regs[EHCI_USBSTS_OFF >> 2] &=
+            ~(v & ~EHCI_STS_HALT);
+        return;
+
+    case EHCI_PORTSC0_OFF:
+    case EHCI_PORTSC1_OFF:
+        /*
+         * No downstream device is attached in M1.  Preserve only port power;
+         * never fabricate connect/change/enable state.
+         */
+        s->usbhost_regs[addr >> 2] = v & EHCI_PORT_POWER;
+        return;
+
+    default:
+        s->usbhost_regs[addr >> 2] = v;
+        return;
     }
 }
 
