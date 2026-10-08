@@ -79,7 +79,7 @@
 #define SPI_CMD_RDID             0x9f
 
 typedef struct RT3883F9K1103State {
-    MemoryRegion soc_mmio, fe_mmio, flash_mr;
+    MemoryRegion soc_mmio, fe_mmio, flash_mr, ram_mirror;
     CharBackend chr;
     uint32_t soc_regs[RT3883_SOC_SIZE / 4];
     uint32_t fe_regs[RT3883_FE_SIZE / 4];
@@ -424,6 +424,18 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     cpu_mips_clock_init(cpu);
     error_report("RT3883_M1_STAGE=ram_map");
     memory_region_add_subregion(sysmem, 0, machine->ram);
+
+    /*
+     * RT3883 memory sizing relies on SDRAM address-line mirroring:
+     * Linux 4.4 detect_memory_region() compares a magic value at
+     * dm + 2/4/.../64 MiB and expects a 64 MiB board to alias at +64 MiB.
+     * Keep installed RAM exactly 64 MiB; expose 64..128 MiB only as a mirror
+     * of physical 0..64 MiB so the probe observes real board semantics.
+     */
+    memory_region_init_alias(&s->ram_mirror, OBJECT(machine),
+                             "rt3883.sdram-mirror",
+                             machine->ram, 0, RT3883_RAM_SIZE);
+    memory_region_add_subregion(sysmem, RT3883_RAM_SIZE, &s->ram_mirror);
 
     error_report("RT3883_M1_STAGE=soc_mmio");
     memory_region_init_io(&s->soc_mmio, OBJECT(machine), &rt3883_soc_ops, s,
