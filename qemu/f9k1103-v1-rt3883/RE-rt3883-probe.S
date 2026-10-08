@@ -217,6 +217,33 @@ _start:
     nop
 
     /*
+     * RT2800 RFCSR indirect engine @ WMAC+0x0500:
+     * write RFCSR2=0x5a, require BUSY self-clear, then read back.
+     */
+    li $t1,0x0003025a
+    sw $t1,0x0500($t0)
+    lw $t2,0x0500($t0)
+    li $t3,0x00020000
+    and $t3,$t2,$t3
+    bnez $t3,wmac_rf_fail
+    nop
+
+    li $t1,0x00020200
+    sw $t1,0x0500($t0)
+    lw $t2,0x0500($t0)
+    li $t3,0x00020000
+    and $t3,$t2,$t3
+    bnez $t3,wmac_rf_fail
+    nop
+    andi $t3,$t2,0x00ff
+    li $t4,0x005a
+    bne $t3,$t4,wmac_rf_fail
+    nop
+    la $a0,msg_wmac_rf
+    jal uart_puts
+    nop
+
+    /*
      * FE reset is bit21.  This write must not reboot the whole machine.
      */
     lui $s1,0xb000
@@ -328,6 +355,12 @@ gpio_bank_fail:
     nop
     b hang
     nop
+wmac_rf_fail:
+    la $a0,msg_wmac_rf_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 wmac_bbp_fail:
     la $a0,msg_wmac_bbp_fail
     jal uart_puts
@@ -409,6 +442,7 @@ msg_pci_host: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=PASS\n"
 msg_usb_host: .asciz "RT3883_F9K1103V1_USB_HOST_2PORT_GATE=PASS\n"
 msg_wmac_probe: .asciz "RT3883_F9K1103V1_WMAC_RT3883_REV0400_GATE=PASS\n"
 msg_wmac_bbp: .asciz "RT3883_F9K1103V1_WMAC_BBP_INDIRECT_GATE=PASS\n"
+msg_wmac_rf: .asciz "RT3883_F9K1103V1_WMAC_RFCSR_INDIRECT_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
@@ -424,5 +458,6 @@ msg_pci_host_fail: .asciz "RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=FAIL\n"
 msg_usb_host_fail: .asciz "RT3883_F9K1103V1_USB_HOST_2PORT_GATE=FAIL\n"
 msg_wmac_probe_fail: .asciz "RT3883_F9K1103V1_WMAC_RT3883_REV0400_GATE=FAIL\n"
 msg_wmac_bbp_fail: .asciz "RT3883_F9K1103V1_WMAC_BBP_INDIRECT_GATE=FAIL\n"
+msg_wmac_rf_fail: .asciz "RT3883_F9K1103V1_WMAC_RFCSR_INDIRECT_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
 msg_spi_rdsr_fail: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=FAIL\n"
