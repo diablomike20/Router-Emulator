@@ -191,38 +191,39 @@ jobs:
           mkdir -p "$OUT"
           cp "$BIN" "$OUT/"
 
-          # Resolve non-system PE dependencies recursively from UCRT64.
-          # Native Windows Python does not understand MSYS2's /ucrt64 mount,
-          # so pass the real Windows prefix produced by cygpath.
-          UCRT_BIN_WIN="$(cygpath -w /ucrt64/bin)"
-          python3 - "$BIN" "$OUT" "$UCRT_BIN_WIN" <<'PY'
-          from pathlib import Path
-          import re, shutil, subprocess, sys
-          root=Path(sys.argv[2])
-          prefix=Path(sys.argv[3])
-          queue=[Path(sys.argv[1])]
-          seen=set()
-          while queue:
-              f=queue.pop(0)
-              out=subprocess.check_output(["objdump","-p",str(f)], text=True, errors="ignore")
-              for name in re.findall(r"DLL Name:\s*([^\r\n]+)", out, re.I):
-                  name=name.strip()
-                  key=name.lower()
-                  if key in seen:
-                      continue
-                  seen.add(key)
-                  src=prefix/name
-                  if not src.exists():
-                      continue
-                  dst=root/name
-                  if not dst.exists():
-                      shutil.copy2(src,dst)
-                  queue.append(dst)
-          dlls=list(root.glob("*.dll"))
-          print("BUNDLED_DLLS="+str(len(dlls)))
-          if not dlls:
-              raise SystemExit("ERROR: no UCRT64 DLL dependencies bundled")
-          PY
+          # Resolve PE dependencies recursively from UCRT64 using MSYS2 paths.
+          # Keep this in shell so the artifact cannot silently omit the DLLs.
+          queue_file="$RUNNER_TEMP/re-dll-queue.txt"
+          seen_file="$RUNNER_TEMP/re-dll-seen.txt"
+          : > "$queue_file"
+          : > "$seen_file"
+          printf '%s\n' "$BIN" >> "$queue_file"
+
+          while [ -s "$queue_file" ]; do
+            current="$(head -n1 "$queue_file")"
+            tail -n +2 "$queue_file" > "$queue_file.next"
+            mv "$queue_file.next" "$queue_file"
+
+            objdump -p "$current" | awk '/DLL Name:/ {print $3}' | tr -d '\r' | while read -r dll; do
+              [ -n "$dll" ] || continue
+              key="$(printf '%s' "$dll" | tr '[:upper:]' '[:lower:]')"
+              grep -Fxq "$key" "$seen_file" && continue
+              printf '%s\n' "$key" >> "$seen_file"
+
+              src="/ucrt64/bin/$dll"
+              if [ -f "$src" ]; then
+                cp -f "$src" "$OUT/$dll"
+                printf '%s\n' "$OUT/$dll" >> "$queue_file"
+              fi
+            done
+          done
+
+          DLL_COUNT="$(find "$OUT" -maxdepth 1 -type f -iname '*.dll' | wc -l | tr -d ' ')"
+          echo "BUNDLED_DLLS=$DLL_COUNT"
+          [ "$DLL_COUNT" -ge 8 ] || {
+            echo "ERROR: expected portable dependency DLL bundle, got $DLL_COUNT" >&2
+            exit 1
+          }
 
           cat > "$OUT/RE-START-EMULATOR.cmd" <<'CMD'
           @echo off
@@ -240,7 +241,7 @@ jobs:
             -bios runtime\RE-F9K1103-UBOOT-PAYLOAD.bin ^
             -kernel runtime\RE-F9K1103-FLASH8M.bin ^
             -display none -monitor none -serial stdio ^
-            -netdev user,id=net0,net=192.168.1.0/24,hostfwd=tcp:127.0.0.1:18080-192.168.1.1:80,hostfwd=tcp:127.0.0.1:12222-192.168.1.1:22
+            -netdev user,id=net0,net=192.168.10.0/24,hostfwd=tcp:127.0.0.1:18080-192.168.10.2:80,hostfwd=tcp:127.0.0.1:12222-192.168.10.2:22
           endlocal
           CMD
 
@@ -249,8 +250,8 @@ jobs:
 
           Machine: rt3883-f9k1103v1
           RAM: 64 MiB
-          LAN web forward: http://127.0.0.1:18080/
-          SSH forward: 127.0.0.1:12222
+          LAN web forward: http://127.0.0.1:18080/ (guest 192.168.10.2:80)
+          SSH forward: 127.0.0.1:12222 (guest 192.168.10.2:22)
 
           This public CI artifact intentionally does NOT contain private MTD,
           factory/calibration or original Belkin U-Boot bytes.
