@@ -1,0 +1,159 @@
+name: RE F9K1103 Windows portable repack
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - f9k1103-v1-rt3883-cudy-port-v1
+    paths:
+      - '.github/workflows/RE-f9k1103-v1-rt3883-windows-portable-repack.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: re-f9k1103-windows-portable-repack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repack:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-pixman
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-libslirp
+            mingw-w64-ucrt-x86_64-libffi
+            mingw-w64-ucrt-x86_64-libiconv
+            mingw-w64-ucrt-x86_64-gettext-runtime
+            mingw-w64-ucrt-x86_64-bzip2
+            mingw-w64-ucrt-x86_64-zstd
+            mingw-w64-ucrt-x86_64-ncurses
+            mingw-w64-ucrt-x86_64-python
+
+      - name: Download native-smoke-PASS Windows QEMU and probe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 38002511524 --repo "$env:GITHUB_REPOSITORY" --name RE-F9K1103-RT3883-WINDOWS-EMULATOR --dir prior
+          gh run download 38002511524 --repo "$env:GITHUB_REPOSITORY" --name RE-RT3883-WINDOWS-SMOKE-PROBE --dir probe
+          if (-not (Test-Path prior\qemu-system-mipsel.exe)) { throw "prior Windows QEMU missing" }
+          if (-not (Test-Path probe\probe.bin)) { throw "probe.bin missing" }
+
+      - name: Bundle recursive UCRT64 DLL dependencies
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/RE-F9K1103-RT3883-WINDOWS-EMULATOR-PORTABLE"
+          mkdir -p "$OUT/runtime"
+          cp prior/qemu-system-mipsel.exe "$OUT/"
+          cp prior/RE-START-EMULATOR.cmd "$OUT/"
+          cp prior/RE-README-WINDOWS.txt "$OUT/"
+          cp prior/RE-WINDOWS-SMOKE-SERIAL.log "$OUT/"
+          cp prior/RE-PROVENANCE.txt "$OUT/"
+
+          UCRT_BIN_WIN="$(cygpath -w /ucrt64/bin)"
+          python3 - "$OUT/qemu-system-mipsel.exe" "$OUT" "$UCRT_BIN_WIN" <<'PY'
+          from pathlib import Path
+          import re, shutil, subprocess, sys
+          root=Path(sys.argv[2])
+          prefix=Path(sys.argv[3])
+          queue=[Path(sys.argv[1])]
+          seen=set()
+          unresolved=set()
+          while queue:
+              f=queue.pop(0)
+              out=subprocess.check_output(["objdump","-p",str(f)], text=True, errors="ignore")
+              for name in re.findall(r"DLL Name:\s*([^\r\n]+)", out, re.I):
+                  name=name.strip()
+                  key=name.lower()
+                  if key in seen:
+                      continue
+                  seen.add(key)
+                  src=prefix/name
+                  if not src.exists():
+                      unresolved.add(name)
+                      continue
+                  dst=root/name
+                  if not dst.exists():
+                      shutil.copy2(src,dst)
+                  queue.append(dst)
+          dlls=sorted(root.glob("*.dll"))
+          print("BUNDLED_DLLS="+str(len(dlls)))
+          print("UNRESOLVED_SYSTEM_DLLS="+",".join(sorted(unresolved)))
+          if len(dlls) < 8:
+              raise SystemExit("ERROR: too few runtime DLLs bundled")
+          PY
+
+          (cd "$OUT" && sha256sum qemu-system-mipsel.exe *.dll RE-*.txt RE-*.cmd > RE-SHA256SUMS.txt)
+
+      - name: Portable smoke with MSYS2 removed from PATH
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $out = Join-Path $env:RUNNER_TEMP "RE-F9K1103-RT3883-WINDOWS-EMULATOR-PORTABLE"
+          $exe = Join-Path $out "qemu-system-mipsel.exe"
+          $probe = (Resolve-Path "probe\probe.bin").Path
+          $flash = Join-Path $env:RUNNER_TEMP "portable-flash.bin"
+          $serial = Join-Path $env:RUNNER_TEMP "portable-serial.log"
+
+          $bytes = New-Object byte[] (8*1024*1024)
+          [Array]::Fill[byte]($bytes, 0xff)
+          $bytes[0] = 0x5a
+          $bytes[0x1000] = 0x00
+          $bytes[0x1fff] = 0x00
+          $bytes[0x2000] = 0x00
+          [IO.File]::WriteAllBytes($flash, $bytes)
+
+          $env:PATH = "$out;$env:SystemRoot\System32;$env:SystemRoot"
+
+          $machines = & $exe -M help 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0 -or $machines -notmatch "rt3883-f9k1103v1") {
+            throw "portable -M help failed"
+          }
+
+          $args = @("-M","rt3883-f9k1103v1","-m","64M","-bios",$probe,"-kernel",$flash,"-display","none","-monitor","none","-serial","file:$serial")
+          $p = Start-Process -FilePath $exe -ArgumentList $args -PassThru -NoNewWindow
+          Start-Sleep -Seconds 10
+          if (-not $p.HasExited) {
+            Stop-Process -Id $p.Id -Force
+            $p.WaitForExit()
+          }
+
+          if (-not (Test-Path $serial)) { throw "portable serial missing" }
+          $log = Get-Content -Raw $serial
+          foreach ($gate in @(
+            "RT3883_F9K1103V1_FLASH_ALIAS_GATE=PASS",
+            "RT3883_F9K1103V1_SPI_ERASE_4K_GATE=PASS",
+            "RT3883_F9K1103V1_WMAC_RT3883_REV0400_GATE=PASS",
+            "RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS"
+          )) {
+            if ($log -notmatch [regex]::Escape($gate)) { throw "missing gate: $gate" }
+          }
+
+          Copy-Item $serial (Join-Path $out "RE-WINDOWS-PORTABLE-SMOKE-SERIAL.log")
+          @(
+            "RT3883_WINDOWS_PORTABLE_PACKAGE_GATE=PASS",
+            "native_source_run=38002511524",
+            "native_source_sha=73ef638414e1d94f9e577124736ad9628335fdc2",
+            "msys2_path_used_for_portable_smoke=NO"
+          ) | Set-Content (Join-Path $out "RE-WINDOWS-PORTABLE-GATE.txt")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RE-F9K1103-RT3883-WINDOWS-EMULATOR-PORTABLE
+          path: ${{ runner.temp }}/RE-F9K1103-RT3883-WINDOWS-EMULATOR-PORTABLE/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
