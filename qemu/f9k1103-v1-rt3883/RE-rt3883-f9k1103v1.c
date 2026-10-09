@@ -239,6 +239,8 @@ typedef struct RT3883F9K1103State {
     bool fe_tx_needs_csum;
     unsigned fe_rx_debug_count;
     unsigned fe_tx_debug_count;
+    unsigned fe_irq_debug_count;
+    bool fe_irq_level;
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -344,9 +346,17 @@ static void rt3883_fe_update_irq(RT3883F9K1103State *s)
 {
     uint32_t status = s->fe_regs[FE_INT_STATUS >> 2];
     uint32_t enable = s->fe_regs[FE_INT_ENABLE >> 2];
+    bool level = !!(status & enable);
+
+    if (s->fe_irq_debug_count < 96 && level != s->fe_irq_level) {
+        error_report("RT3883_FE_IRQ_LEVEL=%u status=%08x enable=%08x",
+                     level, status, enable);
+        s->fe_irq_debug_count++;
+    }
+    s->fe_irq_level = level;
 
     if (s->fe_irq) {
-        qemu_set_irq(s->fe_irq, !!(status & enable));
+        qemu_set_irq(s->fe_irq, level);
     }
 }
 
@@ -361,6 +371,8 @@ static void rt3883_fe_reset(RT3883F9K1103State *s)
     s->fe_tx_needs_csum = false;
     s->fe_rx_debug_count = 0;
     s->fe_tx_debug_count = 0;
+    s->fe_irq_debug_count = 0;
+    s->fe_irq_level = false;
     rt3883_fe_update_irq(s);
 }
 
@@ -1195,13 +1207,24 @@ static void rt3883_fe_write(void *opaque, hwaddr addr, uint64_t val, unsigned si
     }
 
     if (addr == FE_INT_STATUS) {
+        uint32_t before = s->fe_regs[FE_INT_STATUS >> 2];
         /* Legacy FE interrupt status is write-one-to-clear. */
         s->fe_regs[FE_INT_STATUS >> 2] &= ~v;
+        if (s->fe_irq_debug_count < 96) {
+            error_report("RT3883_FE_INT_ACK write=%08x before=%08x after=%08x",
+                         v, before, s->fe_regs[FE_INT_STATUS >> 2]);
+            s->fe_irq_debug_count++;
+        }
         rt3883_fe_update_irq(s);
         return;
     }
 
     if (addr == FE_INT_ENABLE) {
+        if (s->fe_irq_debug_count < 96) {
+            error_report("RT3883_FE_INT_ENABLE=%08x old=%08x",
+                         v, s->fe_regs[FE_INT_ENABLE >> 2]);
+            s->fe_irq_debug_count++;
+        }
         s->fe_regs[FE_INT_ENABLE >> 2] = v;
         rt3883_fe_update_irq(s);
         return;
@@ -1220,6 +1243,12 @@ static void rt3883_fe_write(void *opaque, hwaddr addr, uint64_t val, unsigned si
     }
 
     s->fe_regs[addr >> 2] = v;
+
+    if (addr == FE_RX_CALC_IDX0 && s->fe_irq_debug_count < 96) {
+        error_report("RT3883_FE_RX_CALC_WRITE=%u drx=%u next=%u",
+                     v, s->fe_regs[FE_RX_DRX_IDX0 >> 2], s->fe_rx_next);
+        s->fe_irq_debug_count++;
+    }
 
     if (addr == FE_TX_CTX_IDX0 || addr == FE_PDMA_GLO_CFG) {
         rt3883_fe_tx_kick(s);
