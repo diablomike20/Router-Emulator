@@ -114,6 +114,7 @@
 #define SPI_CMD_RDSR             0x05
 #define SPI_CMD_READ             0x03
 #define SPI_CMD_PP               0x02
+#define SPI_CMD_BE_4K            0x20
 #define SPI_CMD_SE               0xd8
 #define SPI_CMD_RDID             0x9f
 
@@ -300,16 +301,21 @@ static void rt3883_spi_write_byte(RT3883F9K1103State *s, uint8_t v)
         return;
     }
     if (s->spi_cmd == SPI_CMD_READ || s->spi_cmd == SPI_CMD_PP ||
-        s->spi_cmd == SPI_CMD_SE) {
+        s->spi_cmd == SPI_CMD_BE_4K || s->spi_cmd == SPI_CMD_SE) {
         if (s->spi_addr_bytes < 3) {
             s->spi_addr = (s->spi_addr << 8) | v;
             s->spi_addr_bytes++;
-            if (s->spi_addr_bytes == 3 && s->spi_cmd == SPI_CMD_SE && s->spi_wel) {
-                uint32_t base = s->spi_addr & ~0xffffU;
-                if (base < RT3883_FLASH_SIZE)
+            if (s->spi_addr_bytes == 3 && s->spi_wel &&
+                (s->spi_cmd == SPI_CMD_BE_4K || s->spi_cmd == SPI_CMD_SE)) {
+                uint32_t erase_size =
+                    s->spi_cmd == SPI_CMD_BE_4K ? 0x1000U : 0x10000U;
+                uint32_t base = s->spi_addr & ~(erase_size - 1U);
+
+                if (base < RT3883_FLASH_SIZE) {
                     memset(s->flash + base, 0xff,
-                           MIN((uint32_t)0x10000,
+                           MIN(erase_size,
                                (uint32_t)(RT3883_FLASH_SIZE - base)));
+                }
                 s->spi_wel = false;
             }
             return;
