@@ -192,10 +192,14 @@ jobs:
           cp "$BIN" "$OUT/"
 
           # Resolve non-system PE dependencies recursively from UCRT64.
-          python3 - "$BIN" "$OUT" <<'PY'
+          # Native Windows Python does not understand MSYS2's /ucrt64 mount,
+          # so pass the real Windows prefix produced by cygpath.
+          UCRT_BIN_WIN="$(cygpath -w /ucrt64/bin)"
+          python3 - "$BIN" "$OUT" "$UCRT_BIN_WIN" <<'PY'
           from pathlib import Path
           import re, shutil, subprocess, sys
           root=Path(sys.argv[2])
+          prefix=Path(sys.argv[3])
           queue=[Path(sys.argv[1])]
           seen=set()
           while queue:
@@ -207,15 +211,17 @@ jobs:
                   if key in seen:
                       continue
                   seen.add(key)
-                  candidates=[Path("/ucrt64/bin")/name, Path("/usr/bin")/name]
-                  src=next((p for p in candidates if p.exists()), None)
-                  if not src:
+                  src=prefix/name
+                  if not src.exists():
                       continue
                   dst=root/name
                   if not dst.exists():
                       shutil.copy2(src,dst)
                   queue.append(dst)
-          print("BUNDLED_DLLS="+str(len(list(root.glob("*.dll")))))
+          dlls=list(root.glob("*.dll"))
+          print("BUNDLED_DLLS="+str(len(dlls)))
+          if not dlls:
+              raise SystemExit("ERROR: no UCRT64 DLL dependencies bundled")
           PY
 
           cat > "$OUT/RE-START-EMULATOR.cmd" <<'CMD'
@@ -268,6 +274,51 @@ jobs:
           } > "$OUT/RE-PROVENANCE.txt"
 
           (cd "$OUT" && sha256sum * 2>/dev/null > RE-SHA256SUMS.txt || true)
+
+      - name: Run portable package smoke without MSYS2 PATH
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $out = Join-Path $env:RUNNER_TEMP "RE-F9K1103-RT3883-WINDOWS-EMULATOR"
+          $exe = Join-Path $out "qemu-system-mipsel.exe"
+          $probe = Join-Path $env:RUNNER_TEMP "rt3883-win-smoke\\probe.bin"
+          $flash = Join-Path $env:RUNNER_TEMP "rt3883-win-smoke\\flash.bin"
+          $serial = Join-Path $env:RUNNER_TEMP "rt3883-portable-smoke.log"
+
+          # Prove the package does not borrow DLLs from MSYS2/UCRT64 PATH.
+          $env:PATH = "$out;$env:SystemRoot\\System32;$env:SystemRoot"
+
+          $machineList = & $exe -M help 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0 -or $machineList -notmatch "rt3883-f9k1103v1") {
+            throw "portable package machine-list gate failed"
+          }
+
+          $args = @(
+            "-M","rt3883-f9k1103v1","-m","64M",
+            "-bios",$probe,"-kernel",$flash,
+            "-display","none","-monitor","none",
+            "-serial","file:$serial"
+          )
+          $p = Start-Process -FilePath $exe -ArgumentList $args -PassThru -NoNewWindow
+          Start-Sleep -Seconds 10
+          if (-not $p.HasExited) {
+            Stop-Process -Id $p.Id -Force
+            $p.WaitForExit()
+          }
+
+          if (-not (Test-Path $serial)) { throw "portable package serial log missing" }
+          $log = Get-Content -Raw $serial
+          $gates = @(
+            "RT3883_F9K1103V1_FLASH_ALIAS_GATE=PASS",
+            "RT3883_F9K1103V1_SPI_ERASE_4K_GATE=PASS",
+            "RT3883_F9K1103V1_WMAC_RT3883_REV0400_GATE=PASS",
+            "RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS"
+          )
+          foreach ($gate in $gates) {
+            if ($log -notmatch [regex]::Escape($gate)) { throw "missing portable gate: $gate" }
+          }
+          Copy-Item $serial (Join-Path $out "RE-WINDOWS-PORTABLE-SMOKE-SERIAL.log")
+          "RT3883_WINDOWS_PORTABLE_PACKAGE_GATE=PASS" | Set-Content (Join-Path $out "RE-WINDOWS-PORTABLE-GATE.txt")
 
       - uses: actions/upload-artifact@v4
         with:
