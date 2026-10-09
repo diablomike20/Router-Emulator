@@ -314,6 +314,61 @@ _start:
     nop
 
     /*
+     * Linux exposes the physical MX25L6405D with 4 KiB erase blocks and
+     * JFFS2 uses the standard SPI-NOR BE_4K opcode 0x20. Prove both erase
+     * semantics and granularity:
+     *   flash[0x1000] and flash[0x1fff] start programmed to 0x00,
+     *   flash[0x2000] is a neighboring sentinel and must stay 0x00.
+     */
+    /* WREN transaction. */
+    lw $t0,0x14($s0)
+    andi $t0,$t0,0xfffe
+    sw $t0,0x14($s0)
+    li $a0,0x06
+    jal spi_write_strobe
+    nop
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x01
+    sw $t0,0x14($s0)
+
+    /* BE_4K 0x20 at address 0x001234 => erase 0x1000..0x1fff. */
+    lw $t0,0x14($s0)
+    andi $t0,$t0,0xfffe
+    sw $t0,0x14($s0)
+    li $a0,0x20
+    jal spi_write_strobe
+    nop
+    li $a0,0x00
+    jal spi_write_strobe
+    nop
+    li $a0,0x12
+    jal spi_write_strobe
+    nop
+    li $a0,0x34
+    jal spi_write_strobe
+    nop
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x01
+    sw $t0,0x14($s0)
+
+    /* Direct uncached alias verifies exact 4 KiB erase granularity. */
+    lui $t0,0xbc00
+    ori $t0,$t0,0x1000
+    lbu $t1,0($t0)
+    li $t2,0x00ff
+    bne $t1,$t2,spi_erase4k_fail
+    nop
+    lbu $t1,0x0fff($t0)
+    bne $t1,$t2,spi_erase4k_fail
+    nop
+    lbu $t1,0x1000($t0)
+    bnez $t1,spi_erase4k_fail
+    nop
+    la $a0,msg_spi_erase4k
+    jal uart_puts
+    nop
+
+    /*
      * Exact Belkin reset helper writes literal 1 to 0xb0000034.
      */
     lui $t0,0x8001
@@ -409,11 +464,25 @@ spi_rdsr_fail:
     nop
     b hang
     nop
+spi_erase4k_fail:
+    la $a0,msg_spi_erase4k_fail
+    jal uart_puts
+    nop
+    b hang
+    nop
 spi_fail:
     la $a0,msg_spi_fail
     jal uart_puts
     nop
     b hang
+    nop
+
+spi_write_strobe:
+    sw $a0,0x20($s0)
+    lw $t0,0x14($s0)
+    ori $t0,$t0,0x04
+    sw $t0,0x14($s0)
+    jr $ra
     nop
 
 uart_puts:
@@ -446,6 +515,7 @@ msg_wmac_rf: .asciz "RT3883_F9K1103V1_WMAC_RFCSR_INDIRECT_GATE=PASS\n"
 msg_periph_reset: .asciz "RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS\n"
 msg_spi: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=PASS\n"
 msg_spi_rdsr: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS\n"
+msg_spi_erase4k: .asciz "RT3883_F9K1103V1_SPI_ERASE_4K_GATE=PASS\n"
 msg_system_reset: .asciz "RT3883_F9K1103V1_SYSTEM_RESET_GATE=PASS\n"
 msg_pass: .asciz "RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS\n"
 msg_flash_fail: .asciz "RT3883_F9K1103V1_FLASH_ALIAS_GATE=FAIL\n"
@@ -461,3 +531,4 @@ msg_wmac_bbp_fail: .asciz "RT3883_F9K1103V1_WMAC_BBP_INDIRECT_GATE=FAIL\n"
 msg_wmac_rf_fail: .asciz "RT3883_F9K1103V1_WMAC_RFCSR_INDIRECT_GATE=FAIL\n"
 msg_spi_fail: .asciz "RT3883_F9K1103V1_SPI_RDID_GATE=FAIL\n"
 msg_spi_rdsr_fail: .asciz "RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=FAIL\n"
+msg_spi_erase4k_fail: .asciz "RT3883_F9K1103V1_SPI_ERASE_4K_GATE=FAIL\n"
