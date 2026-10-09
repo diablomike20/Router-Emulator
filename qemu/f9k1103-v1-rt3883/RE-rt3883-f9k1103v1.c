@@ -245,6 +245,10 @@ typedef struct RT3883F9K1103State {
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
+    int flash_fd;
+    bool flash_dirty;
+    uint32_t flash_dirty_start;
+    uint32_t flash_dirty_end;
     uint8_t spi_data, spi_cmd;
     unsigned spi_phase, spi_addr_bytes, rdid_index;
     uint32_t spi_addr;
@@ -291,6 +295,57 @@ static void rt3883_spi_reset_transaction(RT3883F9K1103State *s)
     s->spi_addr = 0; s->rdid_index = 0;
 }
 
+static void rt3883_flash_mark_dirty(RT3883F9K1103State *s,
+                                    uint32_t start, uint32_t len)
+{
+    uint32_t end;
+
+    if (!len || start >= RT3883_FLASH_SIZE) {
+        return;
+    }
+
+    end = MIN((uint32_t)RT3883_FLASH_SIZE, start + len);
+    if (!s->flash_dirty) {
+        s->flash_dirty_start = start;
+        s->flash_dirty_end = end;
+        s->flash_dirty = true;
+    } else {
+        s->flash_dirty_start = MIN(s->flash_dirty_start, start);
+        s->flash_dirty_end = MAX(s->flash_dirty_end, end);
+    }
+}
+
+static void rt3883_flash_flush_dirty(RT3883F9K1103State *s)
+{
+    size_t len;
+    ssize_t wrote;
+
+    if (!s->flash_dirty || s->flash_fd < 0) {
+        s->flash_dirty = false;
+        return;
+    }
+
+    len = s->flash_dirty_end - s->flash_dirty_start;
+    if (lseek(s->flash_fd, s->flash_dirty_start, SEEK_SET) < 0) {
+        error_report("RT3883_SPI_BACKING_SEEK_FAILED off=%u: %s",
+                     s->flash_dirty_start, strerror(errno));
+        s->flash_dirty = false;
+        return;
+    }
+
+    wrote = qemu_write_full(s->flash_fd,
+                            s->flash + s->flash_dirty_start, len);
+    if (wrote != len) {
+        error_report("RT3883_SPI_BACKING_WRITE_FAILED off=%u len=%zu wrote=%zd: %s",
+                     s->flash_dirty_start, len, wrote, strerror(errno));
+    } else {
+        error_report("RT3883_SPI_BACKING_FLUSH off=%08x len=%zu",
+                     s->flash_dirty_start, len);
+    }
+
+    s->flash_dirty = false;
+}
+
 static void rt3883_spi_write_byte(RT3883F9K1103State *s, uint8_t v)
 {
     if (s->spi_phase == 0) {
@@ -312,17 +367,21 @@ static void rt3883_spi_write_byte(RT3883F9K1103State *s, uint8_t v)
                 uint32_t base = s->spi_addr & ~(erase_size - 1U);
 
                 if (base < RT3883_FLASH_SIZE) {
-                    memset(s->flash + base, 0xff,
-                           MIN(erase_size,
-                               (uint32_t)(RT3883_FLASH_SIZE - base)));
+                    uint32_t actual = MIN(erase_size,
+                                          (uint32_t)(RT3883_FLASH_SIZE - base));
+                    memset(s->flash + base, 0xff, actual);
+                    rt3883_flash_mark_dirty(s, base, actual);
                 }
                 s->spi_wel = false;
             }
             return;
         }
         if (s->spi_cmd == SPI_CMD_PP && s->spi_wel &&
-            s->spi_addr < RT3883_FLASH_SIZE)
-            s->flash[s->spi_addr++] &= v;
+            s->spi_addr < RT3883_FLASH_SIZE) {
+            uint32_t addr = s->spi_addr++;
+            s->flash[addr] &= v;
+            rt3883_flash_mark_dirty(s, addr, 1);
+        }
     }
 }
 
@@ -1159,6 +1218,7 @@ static void rt3883_soc_write(void *opaque, hwaddr addr, uint64_t val, unsigned s
             if (s->spi_cs_low && (v & SPI_CTL_STARTRD))
                 s->spi_data = rt3883_spi_read_byte(s);
             if (!s->spi_cs_low) {
+                rt3883_flash_flush_dirty(s);
                 if (s->spi_cmd == SPI_CMD_PP) s->spi_wel = false;
                 rt3883_spi_reset_transaction(s);
             }
@@ -1399,16 +1459,35 @@ static void rt3883_cpu_reset(void *opaque)
 static void rt3883_preload_flash(RT3883F9K1103State *s, const char *filename)
 {
     gchar *contents = NULL; gsize len = 0; GError *gerr = NULL;
-    if (!filename) return;
+
+    s->flash_fd = -1;
+    s->flash_dirty = false;
+
+    if (!filename) {
+        return;
+    }
     if (!g_file_get_contents(filename, &contents, &len, &gerr)) {
         error_report("cannot read SPI image '%s': %s", filename, gerr->message);
-        g_error_free(gerr); exit(1);
+        g_error_free(gerr);
+        exit(1);
     }
     if (len > RT3883_FLASH_SIZE) {
         error_report("SPI image too large: %zu", (size_t)len);
-        g_free(contents); exit(1);
+        g_free(contents);
+        exit(1);
     }
-    memcpy(s->flash, contents, len); g_free(contents);
+
+    memcpy(s->flash, contents, len);
+    g_free(contents);
+
+    s->flash_fd = qemu_open_old(filename, O_RDWR | O_BINARY);
+    if (s->flash_fd < 0) {
+        error_report("cannot open writable SPI backing '%s': %s",
+                     filename, strerror(errno));
+        exit(1);
+    }
+
+    error_report("RT3883_SPI_BACKING_FILE=%s bytes=%zu", filename, (size_t)len);
 }
 
 static void rt3883_f9k1103v1_init(MachineState *machine)
