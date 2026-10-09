@@ -238,6 +238,7 @@ typedef struct RT3883F9K1103State {
     size_t fe_tx_frame_len;
     bool fe_tx_needs_csum;
     unsigned fe_rx_debug_count;
+    unsigned fe_tx_debug_count;
     uint8_t uart_rx[256];
     unsigned uart_rx_r, uart_rx_w;
     uint8_t *flash;
@@ -359,6 +360,7 @@ static void rt3883_fe_reset(RT3883F9K1103State *s)
     s->fe_tx_frame_len = 0;
     s->fe_tx_needs_csum = false;
     s->fe_rx_debug_count = 0;
+    s->fe_tx_debug_count = 0;
     rt3883_fe_update_irq(s);
 }
 
@@ -453,6 +455,13 @@ static void rt3883_fe_tx_emit(RT3883F9K1103State *s)
 
     len = rt3883_fe_lan_egress(s->fe_tx_frame, s->fe_tx_frame_len,
                                frame, sizeof(frame));
+    if (len && s->fe_tx_debug_count < 48) {
+        error_report("RT3883_FE_TX_FRAME=%u len=%zu dst=%02x:%02x:%02x:%02x:%02x:%02x src=%02x:%02x:%02x:%02x:%02x:%02x etype=%02x%02x",
+                     s->fe_tx_debug_count++, len,
+                     frame[0], frame[1], frame[2], frame[3], frame[4], frame[5],
+                     frame[6], frame[7], frame[8], frame[9], frame[10], frame[11],
+                     frame[12], frame[13]);
+    }
     if (len && s->fe_tx_needs_csum) {
         /*
          * LEDE 4.4 sets TX_DMA_CHKSUM when skb->ip_summed is
@@ -513,6 +522,13 @@ static bool rt3883_fe_rx_inject(RT3883F9K1103State *s,
         return false;
     }
 
+    if (s->fe_rx_debug_count < 48 && size >= 14) {
+        error_report("RT3883_FE_RX_FRAME=%u len=%zu dst=%02x:%02x:%02x:%02x:%02x:%02x src=%02x:%02x:%02x:%02x:%02x:%02x etype=%02x%02x",
+                     s->fe_rx_debug_count, size,
+                     buf[0], buf[1], buf[2], buf[3], buf[4], buf[5],
+                     buf[6], buf[7], buf[8], buf[9], buf[10], buf[11],
+                     buf[12], buf[13]);
+    }
     frame_len = rt3883_fe_lan_ingress(buf, size, frame, sizeof(frame));
     if (!frame_len || frame_len > FE_RX_DMA_BUF_LEN) {
         return false;
@@ -1413,6 +1429,10 @@ static void rt3883_f9k1103v1_init(MachineState *machine)
     s->fe_nic = qemu_new_nic(&net_rt3883_fe_info, &s->fe_nic_conf,
                              "rt3883-fe", "rt3883-fe",
                              &s->fe_net_reentrancy_guard, s);
+    error_report("RT3883_FE_BACKEND_MAC=%02x:%02x:%02x:%02x:%02x:%02x",
+                 s->fe_nic_conf.macaddr.a[0], s->fe_nic_conf.macaddr.a[1],
+                 s->fe_nic_conf.macaddr.a[2], s->fe_nic_conf.macaddr.a[3],
+                 s->fe_nic_conf.macaddr.a[4], s->fe_nic_conf.macaddr.a[5]);
     s->fe_rx_flush_bh = qemu_bh_new(rt3883_fe_flush_rx_bh, s);
     qemu_format_nic_info_str(qemu_get_queue(s->fe_nic),
                              s->fe_nic_conf.macaddr.a);
