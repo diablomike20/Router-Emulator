@@ -1235,7 +1235,14 @@ static void rt3883_fe_write(void *opaque, hwaddr addr, uint64_t val, unsigned si
             s->fe_regs[FE_TX_DTX_IDX0 >> 2] = 0;
         }
         if (v & FE_PST_DRX_IDX0) {
+            /*
+             * RX index reset restarts the hardware producer at descriptor 0.
+             * Keep the emulator's private producer cursor in lock-step with
+             * RX_DRX_IDX0; otherwise a guest down/up cycle leaves Linux
+             * polling descriptor 0 while QEMU resumes at a stale slot.
+             */
             s->fe_regs[FE_RX_DRX_IDX0 >> 2] = 0;
+            s->fe_rx_next = 0;
         }
         /* Reset bits are command strobes. */
         s->fe_regs[FE_PDMA_RST_CFG >> 2] = 0;
