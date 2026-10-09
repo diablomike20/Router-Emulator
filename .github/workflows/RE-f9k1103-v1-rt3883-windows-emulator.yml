@@ -1,0 +1,276 @@
+name: RE F9K1103 RT3883 Windows emulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - f9k1103-v1-rt3883-cudy-port-v1
+    paths:
+      - '.github/workflows/RE-f9k1103-v1-rt3883-windows-emulator.yml'
+      - 'qemu/f9k1103-v1-rt3883/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: re-f9k1103-rt3883-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-probe:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build compact MIPS smoke probe
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y gcc-mipsel-linux-gnu binutils-mipsel-linux-gnu
+          mkdir -p "$RUNNER_TEMP/probe"
+          mipsel-linux-gnu-as -32 -o "$RUNNER_TEMP/probe/probe.o" qemu/f9k1103-v1-rt3883/RE-rt3883-probe.S
+          mipsel-linux-gnu-ld -m elf32ltsmip -Ttext 0x80200000 -e _start -o "$RUNNER_TEMP/probe/probe.elf" "$RUNNER_TEMP/probe/probe.o"
+          mipsel-linux-gnu-objcopy -O binary -j .text -j .rodata -j .data "$RUNNER_TEMP/probe/probe.elf" "$RUNNER_TEMP/probe/probe.bin"
+          test -s "$RUNNER_TEMP/probe/probe.bin"
+          sha256sum "$RUNNER_TEMP/probe/probe.bin" > "$RUNNER_TEMP/probe/RE-probe.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RE-RT3883-WINDOWS-SMOKE-PROBE
+          path: ${{ runner.temp }}/probe/
+          retention-days: 7
+
+  windows-emulator:
+    needs: build-probe
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            make
+            diffutils
+            patch
+            perl
+            coreutils
+            grep
+            sed
+            tar
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-meson
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-glib2
+            mingw-w64-ucrt-x86_64-pixman
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-libslirp
+            mingw-w64-ucrt-x86_64-libffi
+            mingw-w64-ucrt-x86_64-libiconv
+            mingw-w64-ucrt-x86_64-gettext-runtime
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: RE-RT3883-WINDOWS-SMOKE-PROBE
+          path: probe
+
+      - name: Build native Windows QEMU with RT3883 machine
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/rt3883-win"
+          SRC="$WORK/qemu"
+          BUILD="$WORK/build"
+          mkdir -p "$WORK"
+          git clone --depth 1 --branch v8.2.10 https://github.com/qemu/qemu.git "$SRC"
+
+          python3 - "$SRC/configs/devices/mipsel-softmmu/default.mak" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])
+          s=p.read_text()
+          for line in ("CONFIG_USB_EHCI_SYSBUS=y", "CONFIG_USB_OHCI=y"):
+              if line not in s:
+                  s += "\n" + line
+          p.write_text(s)
+          PY
+
+          cp qemu/f9k1103-v1-rt3883/RE-rt3883-f9k1103v1.c "$SRC/hw/mips/rt3883_f9k1103v1.c"
+          python3 - "$SRC/hw/mips/meson.build" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])
+          s=p.read_text()
+          line="mips_ss.add(files('rt3883_f9k1103v1.c'))"
+          anchor="mips_ss.add(files('bootloader.c', 'mips_int.c'))"
+          if line not in s:
+              if anchor not in s:
+                  raise SystemExit("QEMU mips meson anchor not found")
+              p.write_text(s.replace(anchor, anchor+"\n"+line, 1))
+          PY
+
+          mkdir -p "$BUILD"
+          cd "$BUILD"
+          "$SRC/configure" \
+            --target-list=mipsel-softmmu \
+            --disable-werror \
+            --disable-vnc \
+            --disable-png \
+            --disable-sdl \
+            --disable-gtk \
+            --disable-opengl \
+            --disable-docs \
+            --enable-slirp
+          ninja qemu-system-mipsel.exe
+          test -x qemu-system-mipsel.exe
+          ./qemu-system-mipsel.exe -M help | grep -q 'rt3883-f9k1103v1'
+          echo RT3883_WINDOWS_QEMU_BUILD_GATE=PASS
+
+      - name: Run native Windows RT3883 smoke gate
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          QEMU="$RUNNER_TEMP/rt3883-win/build/qemu-system-mipsel.exe"
+          WORK="$RUNNER_TEMP/rt3883-win-smoke"
+          mkdir -p "$WORK"
+          cp probe/probe.bin "$WORK/probe.bin"
+          python3 - "$WORK/flash.bin" <<'PY'
+          from pathlib import Path
+          import sys
+          b=bytearray(b'\xff'*(8*1024*1024))
+          b[0]=0x5a
+          b[0x1000]=0x00
+          b[0x1fff]=0x00
+          b[0x2000]=0x00
+          Path(sys.argv[1]).write_bytes(b)
+          PY
+          SERIAL="$WORK/serial.log"
+          set +e
+          timeout 10s "$QEMU" -M rt3883-f9k1103v1 -m 64M \
+            -bios "$WORK/probe.bin" -kernel "$WORK/flash.bin" \
+            -display none -monitor none -serial "file:$SERIAL"
+          rc=$?
+          set -e
+          [ "$rc" -eq 0 ] || [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]
+          for gate in \
+            RT3883_F9K1103V1_FLASH_ALIAS_GATE=PASS \
+            RT3883_F9K1103V1_GPIO25_RECOVERY_GATE=PASS \
+            RT3883_F9K1103V1_GPIO24_39_BANK_GATE=PASS \
+            RT3883_F9K1103V1_SYSCFG0_500_DDR2_GATE=PASS \
+            RT3883_F9K1103V1_REVID_1_5_GATE=PASS \
+            RT3883_F9K1103V1_SDRAM_64M_MIRROR_GATE=PASS \
+            RT3883_F9K1103V1_PCI_HOST_NOLINK_GATE=PASS \
+            RT3883_F9K1103V1_USB_HOST_2PORT_GATE=PASS \
+            RT3883_F9K1103V1_WMAC_RT3883_REV0400_GATE=PASS \
+            RT3883_F9K1103V1_WMAC_BBP_INDIRECT_GATE=PASS \
+            RT3883_F9K1103V1_WMAC_RFCSR_INDIRECT_GATE=PASS \
+            RT3883_F9K1103V1_PERIPHERAL_RESET_ISOLATION_GATE=PASS \
+            RT3883_F9K1103V1_SPI_RDID_GATE=PASS \
+            RT3883_F9K1103V1_SPI_RDSR_STROBE_GATE=PASS \
+            RT3883_F9K1103V1_SPI_ERASE_4K_GATE=PASS \
+            RT3883_F9K1103V1_SYSTEM_RESET_GATE=PASS \
+            RT3883_F9K1103V1_MACHINE_M1_PREP_GATE=PASS
+          do
+            grep -q "$gate" "$SERIAL" || { cat "$SERIAL"; echo "missing gate: $gate" >&2; exit 1; }
+          done
+          echo RT3883_WINDOWS_QEMU_SMOKE_GATE=PASS
+
+      - name: Assemble portable Windows runtime
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/rt3883-win/build/qemu-system-mipsel.exe"
+          OUT="$RUNNER_TEMP/RE-F9K1103-RT3883-WINDOWS-EMULATOR"
+          mkdir -p "$OUT"
+          cp "$BIN" "$OUT/"
+
+          # Resolve non-system PE dependencies recursively from UCRT64.
+          python3 - "$BIN" "$OUT" <<'PY'
+          from pathlib import Path
+          import re, shutil, subprocess, sys
+          root=Path(sys.argv[2])
+          queue=[Path(sys.argv[1])]
+          seen=set()
+          while queue:
+              f=queue.pop(0)
+              out=subprocess.check_output(["objdump","-p",str(f)], text=True, errors="ignore")
+              for name in re.findall(r"DLL Name:\s*([^\r\n]+)", out, re.I):
+                  name=name.strip()
+                  key=name.lower()
+                  if key in seen:
+                      continue
+                  seen.add(key)
+                  candidates=[Path("/ucrt64/bin")/name, Path("/usr/bin")/name]
+                  src=next((p for p in candidates if p.exists()), None)
+                  if not src:
+                      continue
+                  dst=root/name
+                  if not dst.exists():
+                      shutil.copy2(src,dst)
+                  queue.append(dst)
+          print("BUNDLED_DLLS="+str(len(list(root.glob("*.dll")))))
+          PY
+
+          cat > "$OUT/RE-START-EMULATOR.cmd" <<'CMD'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          if not exist runtime\RE-F9K1103-UBOOT-PAYLOAD.bin (
+            echo Missing runtime\RE-F9K1103-UBOOT-PAYLOAD.bin
+            exit /b 2
+          )
+          if not exist runtime\RE-F9K1103-FLASH8M.bin (
+            echo Missing runtime\RE-F9K1103-FLASH8M.bin
+            exit /b 3
+          )
+          qemu-system-mipsel.exe -M rt3883-f9k1103v1 -m 64M ^
+            -bios runtime\RE-F9K1103-UBOOT-PAYLOAD.bin ^
+            -kernel runtime\RE-F9K1103-FLASH8M.bin ^
+            -display none -monitor none -serial stdio ^
+            -netdev user,id=net0,net=192.168.1.0/24,hostfwd=tcp:127.0.0.1:18080-192.168.1.1:80,hostfwd=tcp:127.0.0.1:12222-192.168.1.1:22
+          endlocal
+          CMD
+
+          cat > "$OUT/RE-README-WINDOWS.txt" <<'TXT'
+          Belkin F9K1103 v1 / RT3883 custom QEMU runtime.
+
+          Machine: rt3883-f9k1103v1
+          RAM: 64 MiB
+          LAN web forward: http://127.0.0.1:18080/
+          SSH forward: 127.0.0.1:12222
+
+          This public CI artifact intentionally does NOT contain private MTD,
+          factory/calibration or original Belkin U-Boot bytes.
+
+          Put the private runtime files under .\runtime:
+            RE-F9K1103-UBOOT-PAYLOAD.bin
+            RE-F9K1103-FLASH8M.bin
+
+          Then run RE-START-EMULATOR.cmd.
+          TXT
+
+          mkdir -p "$OUT/runtime"
+          cp "$RUNNER_TEMP/rt3883-win-smoke/serial.log" "$OUT/RE-WINDOWS-SMOKE-SERIAL.log"
+          {
+            echo "source_sha=$GITHUB_SHA"
+            echo "qemu_tag=v8.2.10"
+            echo "machine=rt3883-f9k1103v1"
+            echo "windows_build=UCRT64"
+            echo "private_mtd_in_artifact=NO"
+            echo "smoke_gate=PASS"
+          } > "$OUT/RE-PROVENANCE.txt"
+
+          (cd "$OUT" && sha256sum * 2>/dev/null > RE-SHA256SUMS.txt || true)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RE-F9K1103-RT3883-WINDOWS-EMULATOR
+          path: ${{ runner.temp }}/RE-F9K1103-RT3883-WINDOWS-EMULATOR/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
