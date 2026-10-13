@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euxo pipefail
           cd /tmp/zt-src/ZeroTierOne-1.12.1
-          make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 CC=mips-linux-uclibc-gcc CXX=mips-linux-uclibc-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
+          make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 LDLIBS=-latomic CC=mips-linux-uclibc-gcc CXX=mips-linux-uclibc-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
           mips-linux-uclibc-strip zerotier-one
           mkdir -p "$GITHUB_WORKSPACE/output/native"
           cp zerotier-one "$GITHUB_WORKSPACE/output/native/zerotier-one"
@@ -88,7 +88,7 @@ jobs:
         run: |
           set -euxo pipefail
           cd /tmp/zt-src/ZeroTierOne-1.12.1
-          make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 ZT_STATIC=1 CC=mipsel-linux-muslsf-gcc CXX=mipsel-linux-muslsf-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
+          make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 ZT_STATIC=1 LDLIBS=-latomic CC=mipsel-linux-muslsf-gcc CXX=mipsel-linux-muslsf-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
           mipsel-linux-muslsf-strip zerotier-one
           mkdir -p "$GITHUB_WORKSPACE/output/static"
           cp zerotier-one "$GITHUB_WORKSPACE/output/static/zerotier-one"
