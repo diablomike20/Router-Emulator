@@ -1,0 +1,105 @@
+name: WR1500 ZeroTier native / static cross-build
+on:
+  push:
+    branches:
+      - wr1500-zerotier-native-20261014
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-uclibc:
+    name: Realtek GPL uClibc (preferred)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Install build prerequisites
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential file binutils python3-venv curl ca-certificates libc6-i386 lib32stdc++6
+          python3 -m venv /tmp/gdown
+          /tmp/gdown/bin/pip -q install gdown
+      - name: Retrieve official WR1500 GPL toolchain
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/wr1500
+          /tmp/gdown/bin/gdown --id 1sqW7x8sLHnSitW9ZXxgsrVN3lprFLp45 -O /tmp/wr1500/gpl.tar.gz
+          file /tmp/wr1500/gpl.tar.gz
+          tar -tzf /tmp/wr1500/gpl.tar.gz | grep -m 1 'toolchain/.*bin/mips-linux-uclibc-g++' || true
+          tar -xzf /tmp/wr1500/gpl.tar.gz -C /tmp/wr1500 'GPL_for_AX1500_rtl8197/openwrt/21.02/toolchain'
+          T=/tmp/wr1500/GPL_for_AX1500_rtl8197/openwrt/21.02/toolchain/msdk-6.4.1-mips-EL-4.4-u0.9.33-m32ut-190619
+          echo "$T/bin" >> "$GITHUB_PATH"
+          "$T/bin/mips-linux-uclibc-g++" --version
+      - name: Download verified ZeroTier source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/zt-src
+          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 'https://codeload.github.com/zerotier/ZeroTierOne/tar.gz/1.12.1' -o /tmp/zt-src/1.12.1.tar.gz
+          echo 'c6758a04f161bba1c0ef11fce991029a645ede381ae3862a25a2f5145aaffca8  /tmp/zt-src/1.12.1.tar.gz' | sha256sum -c -
+          tar xzf /tmp/zt-src/1.12.1.tar.gz -C /tmp/zt-src
+      - name: Build native uClibc daemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd /tmp/zt-src/ZeroTierOne-1.12.1
+          make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 CC=mips-linux-uclibc-gcc CXX=mips-linux-uclibc-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
+          mips-linux-uclibc-strip zerotier-one
+          mkdir -p "$GITHUB_WORKSPACE/output/native"
+          cp zerotier-one "$GITHUB_WORKSPACE/output/native/zerotier-one"
+          file zerotier-one | tee "$GITHUB_WORKSPACE/output/native/ELF.txt"
+          readelf -h zerotier-one >> "$GITHUB_WORKSPACE/output/native/ELF.txt"
+          readelf -l zerotier-one >> "$GITHUB_WORKSPACE/output/native/ELF.txt"
+          readelf -d zerotier-one >> "$GITHUB_WORKSPACE/output/native/ELF.txt"
+          sha256sum zerotier-one >> "$GITHUB_WORKSPACE/output/native/ELF.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wr1500-zerotier-native-uclibc
+          path: output/native/
+          if-no-files-found: warn
+
+  static-musl-fallback:
+    name: WR1500 MIPS little-endian static musl (independent fallback)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Retrieve verified standalone MIPS LE cross-compiler
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/zt-cross
+          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 'https://github.com/musl-cc/musl.cc/releases/download/v0.0.1/mipsel-linux-muslsf-cross.tgz' -o /tmp/zt-cross/toolchain.tgz
+          echo 'a61c3bbf9fbb0be80fe2abdb4ea8b6f5afdf664b5b4104a3784a326270905216  /tmp/zt-cross/toolchain.tgz' | sha256sum -c -
+          tar -xzf /tmp/zt-cross/toolchain.tgz -C /tmp/zt-cross
+          echo '/tmp/zt-cross/mipsel-linux-muslsf-cross/bin' >> "$GITHUB_PATH"
+      - name: Download verified ZeroTier source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/zt-src
+          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 'https://codeload.github.com/zerotier/ZeroTierOne/tar.gz/1.12.1' -o /tmp/zt-src/1.12.1.tar.gz
+          echo 'c6758a04f161bba1c0ef11fce991029a645ede381ae3862a25a2f5145aaffca8  /tmp/zt-src/1.12.1.tar.gz' | sha256sum -c -
+          tar xzf /tmp/zt-src/1.12.1.tar.gz -C /tmp/zt-src
+      - name: Build static MIPS32r2 softfloat daemon
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd /tmp/zt-src/ZeroTierOne-1.12.1
+          make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 ZT_STATIC=1 CC=mipsel-linux-muslsf-gcc CXX=mipsel-linux-muslsf-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
+          mipsel-linux-muslsf-strip zerotier-one
+          mkdir -p "$GITHUB_WORKSPACE/output/static"
+          cp zerotier-one "$GITHUB_WORKSPACE/output/static/zerotier-one"
+          file zerotier-one | tee "$GITHUB_WORKSPACE/output/static/ELF.txt"
+          readelf -h zerotier-one >> "$GITHUB_WORKSPACE/output/static/ELF.txt"
+          readelf -l zerotier-one >> "$GITHUB_WORKSPACE/output/static/ELF.txt"
+          readelf -d zerotier-one >> "$GITHUB_WORKSPACE/output/static/ELF.txt" || true
+          sha256sum zerotier-one >> "$GITHUB_WORKSPACE/output/static/ELF.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wr1500-zerotier-static-musl
+          path: output/static/
+          if-no-files-found: warn
