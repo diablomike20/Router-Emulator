@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p /tmp/wr1500
-          /tmp/gdown/bin/gdown --id 1sqW7x8sLHnSitW9ZXxgsrVN3lprFLp45 -O /tmp/wr1500/gpl.tar.gz
+          /tmp/gdown/bin/gdown 'https://drive.google.com/uc?id=1sqW7x8sLHnSitW9ZXxgsrVN3lprFLp45' -O /tmp/wr1500/gpl.tar.gz
           file /tmp/wr1500/gpl.tar.gz
           tar -tzf /tmp/wr1500/gpl.tar.gz | grep -m 1 'toolchain/.*bin/mips-linux-uclibc-g++' || true
           tar -xzf /tmp/wr1500/gpl.tar.gz -C /tmp/wr1500 'GPL_for_AX1500_rtl8197/openwrt/21.02/toolchain'
