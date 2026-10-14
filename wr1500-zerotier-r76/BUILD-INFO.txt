@@ -1,0 +1,5 @@
+Upstream: ZeroTier 1.8.10, commit 7e46c8359231b4aa55c5d739462c4e5682d35755
+Target: Cudy WR1500 R76 2.3.10, MIPS32r2 little-endian, uClibc 0.9.33
+GPL toolchain: Cudy AX1500 RTL8197 GCC 6.4.1
+Source native GitHub Action: https://github.com/diablomike20/Router-Emulator/actions/runs/38488091298
+Physical test: zerotier-one ONLINE and joined 3b19b3a716829057; reboot test pending
