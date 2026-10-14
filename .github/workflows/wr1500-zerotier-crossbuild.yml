@@ -63,6 +63,10 @@ jobs:
           readelf -l zerotier-one >> "$GITHUB_WORKSPACE/output/native/ELF.txt"
           readelf -d zerotier-one >> "$GITHUB_WORKSPACE/output/native/ELF.txt"
           sha256sum zerotier-one >> "$GITHUB_WORKSPACE/output/native/ELF.txt"
+          # Emulated process start: uses the SAME GPL uClibc sysroot as the router.
+          sudo apt-get install -y --no-install-recommends qemu-user
+          SDK=/tmp/wr1500/GPL_for_AX1500_rtl8197/openwrt/21.02/toolchain/msdk-6.4.1-mips-EL-4.4-u0.9.33-m32ut-190619
+          qemu-mipsel -L "$SDK/mips-linux-uclibc" ./zerotier-one -v 2>&1 | tee "$GITHUB_WORKSPACE/output/native/QEMU-version-smoke.txt"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
