@@ -1,0 +1,43 @@
+name: Publish WR1500 ZeroTier permanent GitHub Release
+on:
+  push:
+    branches: [wr1500-zerotier-native-20261014]
+    paths: ['.github/workflows/wr1500-zerotier-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: wr1500-zerotier-native-20261014
+          persist-credentials: true
+      - name: Verify WR1500 physical-test-proven executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd wr1500-zerotier-r76
+          echo 'c73ae09be5a241e978a85bfea33b0c51b7c5b9a7e7d1b1dc395c7e3809fe2090  zerotier-one.gz' | sha256sum -c -
+          gzip -dc zerotier-one.gz | sha256sum | grep '^364c1f2691f5b4100e4d01bb5fc7fdba9f385e8910dcdeb5efc59d28574988ab  -$'
+          test "$(stat -c %s zerotier-one.gz)" -eq 460365
+      - name: Create permanent tagged Release and attach binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag='wr1500-zerotier-1.8.10-r76'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists: $tag"
+            exit 0
+          fi
+          gh release create "$tag" \
+            wr1500-zerotier-r76/zerotier-one.gz \
+            wr1500-zerotier-r76/SHA256SUMS \
+            wr1500-zerotier-r76/BUILD-INFO.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target wr1500-zerotier-native-20261014 \
+            --title 'OpenCudy WR1500 R76 - ZeroTier 1.8.10 (native uClibc)' \
+            --notes 'Native MIPS32r2 little-endian/uClibc ZeroTier 1.8.10 for Cudy WR1500 R76 / 2.3.10, built with the vendor Realtek GPL GCC 6.4.1 toolchain. Statically links libatomic, but uses vendor uClibc. Verified using QEMU and by actual WR1500: ONLINE, network 3b19b3a716829057 OK, preserved node identity across reboot. Binary is intended to be downloaded and unpacked to RAM at boot; do not flash as firmware. SHA256 compressed: c73ae09be5a241e978a85bfea33b0c51b7c5b9a7e7d1b1dc395c7e3809fe2090. SHA256 ELF: 364c1f2691f5b4100e4d01bb5fc7fdba9f385e8910dcdeb5efc59d28574988ab. No node keys or private identity are included.'
