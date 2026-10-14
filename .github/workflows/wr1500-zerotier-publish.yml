@@ -1,0 +1,51 @@
+name: Publish WR1500 ZeroTier RAM binary on isolated branch
+on:
+  push:
+    branches:
+      - wr1500-zerotier-native-20261014
+    paths:
+      - .github/workflows/wr1500-zerotier-publish.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: wr1500-zerotier-native-20261014
+          persist-credentials: true
+      - name: Retrieve exact successful native GPL build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            'https://api.github.com/repos/diablomike20/Router-Emulator/actions/artifacts/11860347399/zip' \
+            -o /tmp/zt-native-artifact.zip
+          unzip -p /tmp/zt-native-artifact.zip zerotier-one >/tmp/zerotier-one
+          echo '364c1f2691f5b4100e4d01bb5fc7fdba9f385e8910dcdeb5efc59d28574988ab  /tmp/zerotier-one' | sha256sum -c -
+          file /tmp/zerotier-one
+      - name: Store public, credential-free binary with reproducibility data
+        run: |
+          set -euo pipefail
+          mkdir -p wr1500-zerotier-r76
+          gzip -9 -n -c /tmp/zerotier-one >wr1500-zerotier-r76/zerotier-one.gz
+          printf '%s\n' 'Upstream: ZeroTier 1.8.10, commit 7e46c8359231b4aa55c5d739462c4e5682d35755' \
+             'Target: Cudy WR1500 R76 2.3.10, MIPS32r2 little-endian, uClibc 0.9.33' \
+             'GPL toolchain: Cudy AX1500 RTL8197 GCC 6.4.1' \
+             'Source native GitHub Action: https://github.com/diablomike20/Router-Emulator/actions/runs/38488091298' \
+             'Physical test: zerotier-one ONLINE and joined 3b19b3a716829057; reboot test pending' \
+             >wr1500-zerotier-r76/BUILD-INFO.txt
+          sha256sum wr1500-zerotier-r76/zerotier-one.gz | tee wr1500-zerotier-r76/SHA256SUMS
+          git config user.name 'OpenCudy build robot'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add wr1500-zerotier-r76/
+          git diff --cached --quiet && exit 0
+          git commit -m 'Publish reproducible credential-free native ZeroTier for WR1500 [skip ci]'
+          git push origin HEAD:wr1500-zerotier-native-20261014
