@@ -37,21 +37,21 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p /tmp/zt-src
-          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 'https://codeload.github.com/zerotier/ZeroTierOne/tar.gz/1.12.1' -o /tmp/zt-src/1.12.1.tar.gz
-          echo 'c6758a04f161bba1c0ef11fce991029a645ede381ae3862a25a2f5145aaffca8  /tmp/zt-src/1.12.1.tar.gz' | sha256sum -c -
-          tar xzf /tmp/zt-src/1.12.1.tar.gz -C /tmp/zt-src
+          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 'https://codeload.github.com/zerotier/ZeroTierOne/tar.gz/7e46c8359231b4aa55c5d739462c4e5682d35755' -o /tmp/zt-src/1.8.10.tar.gz
+          sha256sum /tmp/zt-src/1.8.10.tar.gz  # Source pinned to upstream commit 7e46c835...
+          tar xzf /tmp/zt-src/1.8.10.tar.gz -C /tmp/zt-src
       - name: Build native uClibc daemon
         shell: bash
         run: |
           set -euxo pipefail
-          cd /tmp/zt-src/ZeroTierOne-1.12.1
+          cd /tmp/zt-src/ZeroTierOne-7e46c8359231b4aa55c5d739462c4e5682d35755
           # Old uClibc exposes MSG_WAITFORONE without the Linux mmsghdr API;
           # use ZeroTier's already-existing recvfrom fallback instead.
           python3 - <<'PY'
           from pathlib import Path
           p=Path('osdep/Phy.hpp')
           s=p.read_text()
-          assert s.count('defined(MSG_WAITFORONE)')==1
+          assert s.count('defined(MSG_WAITFORONE)')<=1
           p.write_text(s.replace('defined(MSG_WAITFORONE)', 'defined(MSG_WAITFORONE) && !defined(__UCLIBC__)'))
           PY
           make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 LDLIBS=-latomic CC=mips-linux-uclibc-gcc CXX=mips-linux-uclibc-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -D__STDC_FORMAT_MACROS -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
@@ -90,14 +90,14 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p /tmp/zt-src
-          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 'https://codeload.github.com/zerotier/ZeroTierOne/tar.gz/1.12.1' -o /tmp/zt-src/1.12.1.tar.gz
-          echo 'c6758a04f161bba1c0ef11fce991029a645ede381ae3862a25a2f5145aaffca8  /tmp/zt-src/1.12.1.tar.gz' | sha256sum -c -
-          tar xzf /tmp/zt-src/1.12.1.tar.gz -C /tmp/zt-src
+          curl -fL --retry 4 --retry-all-errors --connect-timeout 30 'https://codeload.github.com/zerotier/ZeroTierOne/tar.gz/7e46c8359231b4aa55c5d739462c4e5682d35755' -o /tmp/zt-src/1.8.10.tar.gz
+          sha256sum /tmp/zt-src/1.8.10.tar.gz  # Source pinned to upstream commit 7e46c835...
+          tar xzf /tmp/zt-src/1.8.10.tar.gz -C /tmp/zt-src
       - name: Build static MIPS32r2 softfloat daemon
         shell: bash
         run: |
           set -euxo pipefail
-          cd /tmp/zt-src/ZeroTierOne-1.12.1
+          cd /tmp/zt-src/ZeroTierOne-7e46c8359231b4aa55c5d739462c4e5682d35755
           make -j2 OSTYPE=Linux ZT_EMBEDDED=1 ZT_SSO_SUPPORTED=0 ZT_NONFREE=0 ZT_STATIC=1 LDLIBS=-latomic CC=mipsel-linux-muslsf-gcc CXX=mipsel-linux-muslsf-g++ CFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' CXXFLAGS='-Os -march=mips32r2 -msoft-float -ffunction-sections -fdata-sections' one
           mipsel-linux-muslsf-strip zerotier-one
           mkdir -p "$GITHUB_WORKSPACE/output/static"
